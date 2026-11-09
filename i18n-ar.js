@@ -327,7 +327,7 @@ window.BOTC_AR = (() => {
 
   const ui = {
     // Header & tabs
-    "Setup":"التجهيز", "◀ Back":"◀ رجوع", "Next phase ▶":"المرحلة الجاية ▶", "Hide grimoire":"خبّي الكتاب", "Show grimoire":"ورّي الكتاب",
+    "Setup":"التجهيز", "◀ Back":"▶ رجوع", "Next phase ▶":"المرحلة الجاية ◀", "Hide grimoire":"خبّي الكتاب", "Show grimoire":"ورّي الكتاب",
     "Deal":"التوزيع", "Grimoire":"كتاب الراوي", "Night & Day":"الليل والنهار", "Script sheet":"ورقة السكريبت", "Beginner guide":"دليل المبتدئين",
     "Sections":"الأقسام", "Previous phase":"المرحلة اللي فاتت",
     "Beginner":"مبتدئ", "Intermediate":"متوسط", "Advanced":"متقدّم", "Expert":"خبير",
@@ -397,7 +397,8 @@ window.BOTC_AR = (() => {
     "How is the game going? Suggested answers lean toward helping the side that's behind.":"اللعبة ماشية إزاي؟ الإجابات المقترحة بتميل لمساعدة الفريق اللي متأخر.",
     "Good is ahead":"الطيبين متقدّمين", "Even":"متعادلين", "Evil is ahead":"الأشرار متقدّمين",
     "Dusk":"المغرب", "Everyone closes their eyes. Check that heads are down.":"الكل يغمّض. اتأكد إن الروس كلها تحت.",
-    "Minion info":"معلومات الأتباع", "Demon info":"معلومات الشيطان", "Small game":"لعبة صغيرة",
+    "Minion info":"معلومات الأتباع", "Demon info":"معلومات الشيطان", "Small game":"لعبة صغيرة", "ℹ Small game":"ℹ لعبة صغيرة",
+    "Couldn't save: this browser's storage is full or blocked. The game keeps running, but a refresh will lose it.":"مش قادر أحفظ: مساحة التخزين في المتصفح ده مليانة أو مقفولة. اللعبة شغّالة، بس لو عملت ريفريش هتضيع.",
     "With fewer than 7 players, skip Minion info and Demon info.":"لو أقل من 7 لاعيبة، فوّت معلومات الأتباع ومعلومات الشيطان.",
     "Show to the Minions":"ورّيها للأتباع", "Show to the Demon":"ورّيها للشيطان", "Show to player":"ورّيها للاعب", "Another suggestion":"اقتراح تاني",
     "Open the Grimoire for the Spy":"افتح كتاب الراوي للجاسوس", "If the Imp killed themselves: show the new Imp":"لو العفريت قتل نفسه: ورّي العفريت الجديد",
@@ -499,6 +500,7 @@ window.BOTC_AR = (() => {
     "Undo execution":"ارجع في الإعدام", "nominee":"المرشّح", "ghost vote":"صوت شبح", "no vote left":"مفيش صوت فاضل",
     "master isn't voting":"سيده مش بيصوّت", "Not this time":"مش المرة دي",
     "Not this time (they don't register as Townsfolk)":"مش المرة دي (مش بيظهر إنه من أهل البلد)",
+    "No, the Spy doesn't register as Townsfolk":"لأ، الجاسوس مش هيظهر إنه من أهل البلد",
     "Tap ✋ for a raised hand, ✖ for no. The nominee votes last.":"دوس ✋ للإيد المرفوعة، و✖ للأ. المرشّح بيصوّت في الآخر.",
     // Ask them to choose
     "Ask them to choose":"خلّيه يختار", "Ask again":"خلّيه يختار تاني", "They chose:":"اختار:", "No one":"محدش",
@@ -595,6 +597,7 @@ window.BOTC_AR = (() => {
     [/^only counts if (.+) votes$/, "صوته بيتحسب بس لو $1 صوّت"],
     [/^(.+) votes (yes|no)$/, (m, w, v) => `${w} بيصوّت ${v === "yes" ? "آه" : "لأ"}`],
     [/^(.+) nominated the (.+) and is a Townsfolk: they are executed immediately, and the day ends\.$/, "$1 رشّح $2 وهو من أهل البلد: بيتعدم على طول، واليوم بيخلص."],
+    [/^(.+) is the Spy and nominated the (.+)\. You may have the Spy register as a Townsfolk: they are executed immediately, and the day ends\.$/, "$1 هو الجاسوس ورشّح $2. ممكن تخلّي الجاسوس يظهر إنه من أهل البلد: بيتعدم على طول، واليوم بيخلص."],
     [/^(.+) was Cursed by the Witch and nominated: they die now\.$/, "$1 كان ملعون من الساحرة ورشّح: بيموت دلوقتي."],
     [/^🛡️? ?Might not die: (.+)$/, (m, a) => "🛡️ ممكن ميموتش: " + a.replace(/: Protected/g, ": محمي").replace(/: Safe/g, ": في أمان").replace(/ \(someone else might die instead\)/g, " (ممكن حد تاني يموت بداله)")],
     [/^Choose (\d) players and a character$/, "اختار $1 لاعبين وشخصية"],
@@ -624,7 +627,7 @@ window.BOTC_AR = (() => {
     [/^Storyteller difficulty: (\d) out of 5$/, "صعوبة الراوي: $1 من 5"],
     [/^(Beginner|Intermediate|Advanced|Expert) \(est\.\)$/, (m, l) => ({Beginner:"مبتدئ", Intermediate:"متوسط", Advanced:"متقدّم", Expert:"خبير"})[l] + " (تقريبي)"],
     [/^Seat (\d+): (.+), (.+), (alive|dead)\. Drag, or Alt\+arrow keys, to move\.$/, (m, n, p, c, s) =>
-      `كرسي ${n}: ${p.replace(/^Player (\d+)$/, "لاعب $1")}، ${c === "hidden" ? "مخفي" : c}، ${s === "alive" ? "عايش" : "ميّت"}. اسحبه، أو استخدم Alt مع الأسهم، عشان تحرّكه.`],
+      `كرسي ${n}: ${p.replace(/^Player (\d+)$/, "لاعب $1")}، ${c === "hidden" ? "مخفي" : (ui[c] || c)}، ${s === "alive" ? "عايش" : "ميّت"}. اسحبه، أو استخدم Alt مع الأسهم، عشان تحرّكه.`],
     [/^The (.+) \((.+)\) was executed:$/, "$1 ($2) اتعدم:"],
     [/^Show (\d+) \(the true answer is (\d+)\)\.$/, "ورّيه $1 (الإجابة الصح $2)."],
     [/^⏱ (.+?)(?: min)? · (.+) characters \(T\/O\/M\/D\)(?: · (.+))?$/, (m, t, c, ty) => `⏱ ${t}${/دقيقة/.test(t) ? "" : " دقيقة"} · ${c} شخصية (بلد/غلابة/أتباع/شيطان)${ty ? " · " + (ty === "Full" ? "كامل" : ty === "Teensyville" ? "تينسي فيل" : ty) : ""}`],
@@ -639,7 +642,12 @@ window.BOTC_AR = (() => {
     [/^✓ Character counts match the setup rules(?: \(adjusted for (.+)\))?\.$/, (m, a) => `✓ أعداد الشخصيات ماشية صح مع قواعد التجهيز${a ? ` (محسوب فيها ${a})` : ""}.`],
     [/^⚠ Expected (.+)\. Current: (.+)\.$/, (m, a, b) => `⚠ المفروض ${teamWords(a)}. دلوقتي: ${teamWords(b)}.`],
     [/^⚠ Pick which character the (.+) thinks they are \(click their seat\)\.$/, "⚠ اختار $1 فاكر نفسه مين (دوس على كرسيه)."],
-    [/^Wake all Minions \((.+)\)\. Point to the Demon and let the Minions see each other\.$/, "صحّي كل الأتباع ($1). شاور على الشيطان وخلّي الأتباع يشوفوا بعض."],
+    [/^Wake all Minions \((.+)\)\. Point to the Demon and let the Minions see each other\.( Don't wake the Marionette: they think they're good\.)?$/, (m, n, mar) =>
+      `صحّي كل الأتباع (${nob(n)}). شاور على الشيطان وخلّي الأتباع يشوفوا بعض.${mar ? " متصحّيش الأراجوز: فاكر نفسه طيب." : ""}`],
+    [/^\. Also point to the Lunatic \((.+)\)\.$/, ". وشاور كمان على المجنون ($1)."],
+    [/^The Demon was executed, but the (.+) \((.+)\) is alive: play one more day\. Whoever is executed tomorrow, their team loses\.$/, "الشيطان اتعدم، بس $1 ($2) عايش: العبوا يوم كمان. اللي هيتعدم بكرة، فريقه بيخسر."],
+    [/^No living Demon, but both twins are alive: good can't win while the (.+) and their twin live\.$/, "مفيش شيطان عايش، بس التوأم الاتنين عايشين: الطيبين مش هيكسبوا طول ما $1 وتوأمه عايشين."],
+    [/^No Minions in play \(e\.g\. Legion or Atheist game\)\. Give them false information of your choice: any Minion token and 2 players\.$/, "مفيش أتباع في اللعبة (زي لعبة فيها الفيلق أو الملحد). ادّيله معلومة غلط على مزاجك: أي بطاقة تابع و2 لاعبين."],
     [/^Wake the Demon\. Point to their Minions\. Show 3 bluffs: (.+?)\.(?: Also point to the Lunatic \((.+)\)\.)?$/, (m, b, l) =>
       `صحّي الشيطان. شاور على أتباعه. ورّيه 3 خُدع: ${b.replace("none picked yet (Setup tab)", "لسه مفيش (تبويب التجهيز)")}.${l ? ` وشاور كمان على المجنون (${l}).` : ""}`],
     [/^Townsfolk in play: (.+)$/, (m, a) => "أهل البلد في اللعبة: " + nob(a)],

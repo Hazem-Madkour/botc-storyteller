@@ -113,7 +113,7 @@
   .hidden-grim .seat-char, .hidden-grim .seat-icon, .hidden-grim .tags { visibility:hidden; }
   .hidden-grim .seat.townsfolk, .hidden-grim .seat.outsider, .hidden-grim .seat.minion, .hidden-grim .seat.demon { background:var(--panel); color:var(--text); border-color:var(--border); }
 
-  ol.steps { padding-left:0; list-style:none; }
+  ol.steps { padding-inline-start:0; list-style:none; }
   .step { border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin:8px 0; background:var(--panel); color:var(--text); }
   .step.done { opacity:.55; }
   .step.skip { opacity:.5; }
@@ -221,10 +221,16 @@
   fieldset.balance { border:1px solid var(--border); border-radius:10px; margin:10px 0; }
   @media (max-width:600px) {
     header h1 { font-size:16px; }
-    .seat { width:84px; min-height:70px; font-size:11px; }
+    .seat { width:72px; min-height:64px; font-size:11px; }
     .seat-icon { font-size:16px; }
-    .step p, .advice { margin-left:0; }
+    .seat-name { font-size:11px; } .seat-char { font-size:10px; }
+    [dir=rtl] .seat-name { font-size:12px; } [dir=rtl] .seat-char { font-size:11px; }
+    .circle { margin-top:40px; }
+    .step p, .advice { margin-inline-start:0; }
+    header { position:static; }
   }
+  .table-scroll { overflow-x:auto; }
+  @media (pointer:coarse) { button { min-height:44px; } input[type=checkbox] { width:20px; height:20px; } }
   @media print {
     header, nav, .no-print { display:none !important; }
     body { background:#fff; color:#000; }
@@ -647,6 +653,14 @@ function estimateDifficulty(chars, teensy){
   return {level, levelLabel:LEVELS[level] + " (est.)", players, storyteller:Math.min(5, players + (hard >= 6 ? 1 : 0))};
 }
 
+// Reminders that only last until the next night. Poison is only cleared when every poisoner
+// on the script poisons for one night (Widow, Vigormortis and No Dashii poison lasts).
+function communityNightClear(chars){
+  const has = id => chars.some(c => c.id === id);
+  const out = ["Died tonight","Safe","Protected","Master","Mad","Cursed","Drunk until dusk"];
+  if (has("poisoner") && !["widow","vigormortis","nodashii"].some(has)) out.push("Poisoned");
+  return out;
+}
 // Build a playable script from a list of character ids (community or imported).
 function makeScript(meta){
   const chars = [], extras = [], unknown = [];
@@ -667,7 +681,7 @@ function makeScript(meta){
     experience:EXPERIENCE[est.level] + (teensy ? " Built for 5 or 6 players." : ""),
     blurb:`${meta.source === "imported" ? "Imported script" : "Community script"}${meta.author ? ` by ${meta.author}` : ""}.`,
     twists:exp.length ? `Experimental characters: ${exp.slice(0, 6).join(", ")}${exp.length > 6 ? ` and ${exp.length - 6} more` : ""}.` : "Only characters from the three base scripts.",
-    reminders:rem, nightClear:["Died tonight","Safe"], tips:[]};
+    reminders:rem, nightClear:communityNightClear(chars), tips:[]};
 }
 DATA.scripts.forEach(m => { SCRIPTS[m.id] = makeScript(m); });
 
@@ -691,8 +705,15 @@ const reminders = () => SCRIPT.reminders;
 // ---------------------------------------------------------------------------
 const STORE = "trouble-deploying-grimoire-v1";
 function newState(){ return {lang:"en", script:"tb", layout:"circle", customScripts:[], players:[], phase:0, bluffs:[null,null,null], done:{}, notes:"", hidden:false, allowBaron:true, deal:null, advice:{}, choices:{}, picks:{}, balance:"even"}; }
-function load(){ try { return JSON.parse(localStorage.getItem(STORE)); } catch { return null; } }
-function save(){ localStorage.setItem(STORE, JSON.stringify(state)); }
+// Storage can be full or blocked (private mode): keep playing, back up unreadable data, warn once.
+let storageWarned = false;
+function safeSet(key, value){
+  try { localStorage.setItem(key, value); return true; }
+  catch { if (!storageWarned) { storageWarned = true; alert("Couldn't save: this browser's storage is full or blocked. The game keeps running, but a refresh will lose it."); } return false; }
+}
+function backupCorrupt(key){ try { localStorage.setItem(`${key}-corrupt-${Date.now()}`, localStorage.getItem(key)); } catch {} }
+function load(){ try { return JSON.parse(localStorage.getItem(STORE)); } catch { backupCorrupt(STORE); return null; } }
+function save(){ safeSet(STORE, JSON.stringify(state)); }
 let state = Object.assign(newState(), load() || {});
 state.customScripts.forEach(m => { SCRIPTS[m.id] = makeScript(m); });
 useScript(state.script);
@@ -770,7 +791,7 @@ window.alert = m => nativeAlert(isAr() ? trFull(m) : m);
 window.confirm = m => nativeConfirm(isAr() ? trFull(m) : m);
 applyLang();
 let tab = state.players.length ? "grimoire" : "setup";
-let selected = null;
+let selected = null, scrollToEditor = false;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -924,9 +945,16 @@ function rollOnce(n){
 }
 
 // Once every seat has a character: place the Fortune Teller's red herring.
+const isRedHerring = q => q.reminders.some(r => r.toLowerCase() === "red herring");
 function finishSetup(){
-  clearRem(["Red herring"]);
-  if (state.players.some(p => effective(p)?.id === "fortuneteller")) pick(state.players.filter(p => !isEvil(p))).reminders.push("Red herring");
+  state.players.forEach(p => p.reminders = p.reminders.filter(r => r.toLowerCase() !== "red herring"));
+  ensureRedHerring();
+}
+// Hand-built games skip finishSetup, so also place one when Night 1 starts.
+function ensureRedHerring(){
+  const good = state.players.filter(p => p.char && !isEvil(p));
+  if (good.length && state.players.some(p => effective(p)?.id === "fortuneteller") && !state.players.some(isRedHerring))
+    pick(good).reminders.push("Red herring");
 }
 
 function resetGameFlags(){ archiveCurrent(); state.gameId = null; state.gameStart = null; // keep the old game in Past games
@@ -1004,7 +1032,7 @@ function overlayHtml(){
       <button data-action="reveal-cancel">Cancel</button></div>`;
   }
   const src = reveal.mode === "deal" ? state.deal.cards[reveal.cardIdx] : p;
-  const shown = BY_ID[src.char].thinks ? BY_ID[src.drunkAs] : BY_ID[src.char]; // Drunk / Lunatic see their fake character
+  const shown = (BY_ID[src.char].thinks && BY_ID[src.drunkAs]) || BY_ID[src.char]; // Drunk / Lunatic see their fake character
   const evil = ["minion","demon"].includes(shown.team);
   return `<div class="overlay" role="dialog" aria-modal="true" aria-label="Your character">
     <div class="big-icon" aria-hidden="true">${shown.icon}</div>
@@ -1073,7 +1101,7 @@ function makeAdvice(s, ch){
       const tf = others.filter(q => charOf(q)?.team === "townsfolk");
       if (t) {
         if (!tf.length) {
-          const fake = pick(notInPlay("townsfolk")), pair = shuffle(others).slice(0, 2);
+          const fake = pick(notInPlay("townsfolk")) || pick(ofTeam("townsfolk")), pair = shuffle(others).slice(0, 2);
           return A(`No other Townsfolk in play. Show ${tok(fake.id)} and point to ${pointTo(pair)}.`, {label:PAIR_LABEL, token:fake.id, names:ids(pair)});
         }
         const T = pick(tf), pair = pairWith(T, others, decoyPref);
@@ -1087,7 +1115,7 @@ function makeAdvice(s, ch){
         const pair = pairWith(imp, others, q => !isEvil(q));
         return A(`Show ${tok(bluff)}. Point to ${pointTo(pair)}. This backs up the Demon's bluff, a big help for evil.`, {label:PAIR_LABEL, token:bluff, names:ids(pair)});
       }
-      const fake = pick(bal === "evil" ? notInPlay("townsfolk") : tf.length ? tf.map(q => BY_ID[q.char]) : notInPlay("townsfolk"));
+      const fake = pick(bal === "evil" ? notInPlay("townsfolk") : tf.length ? tf.map(q => BY_ID[q.char]) : notInPlay("townsfolk")) || pick(ofTeam("townsfolk"));
       const pair = shuffle(good.filter(q => q.char !== fake.id)).slice(0, 2);
       return A(`Show ${tok(fake.id)}. Point to ${pointTo(pair)} (neither of them is it).`, {label:PAIR_LABEL, token:fake.id, names:ids(pair)});
     }
@@ -1105,6 +1133,7 @@ function makeAdvice(s, ch){
     }
     case "investigator": {
       const mins = others.filter(q => charOf(q)?.team === "minion");
+      if (t && !mins.length) return A("No Minions in play (e.g. Legion or Atheist game). Give them false information of your choice: any Minion token and 2 players.");
       if (t) {
         const M = pick(mins), pair = pairWith(M, others, decoyPref);
         let txt = `Show ${tok(M.char)}. Point to ${pointTo(pair)}. (${esc(M.name)} really is the ${esc(BY_ID[M.char].name)}.)`;
@@ -1137,7 +1166,7 @@ function makeAdvice(s, ch){
       if (!a || !b) return A("Pick their 2 choices above to get an answer.");
       const card = yes => ({label:`Is ${a.name} or ${b.name} the Demon?`, yesno:yes ? "YES" : "NO"});
       // Any Demon counts (not just the Imp), so community scripts with other Demons work too.
-      const hit = [a, b].find(q => isDemon(q) || hasRem(q, "Red herring"));
+      const hit = [a, b].find(q => isDemon(q) || isRedHerring(q));
       const rec = [a, b].find(q => q.char === "recluse");
       if (!t) return A(`Answer <b>${hit ? "NO" : "YES"}</b> (the truth is ${hit ? "yes" : "no"}).`, card(!hit));
       if (hit) return A(`Answer <b>YES</b>: ${nm(hit)} is ${isDemon(hit) ? "the Demon" : "the red herring"}.`, card(true));
@@ -1179,7 +1208,8 @@ function stepCard(stepKey){
   const minions = ps.filter(q => charOf(q)?.team === "minion"), demon = ps.filter(isDemon);
   const lunatic = ps.filter(q => q.char === "lunatic");
   switch (stepKey) {
-    case "minioninfo": return {sections:[{label:"The Demon is", names:ids(demon)}, {label:"The Minions (evil team) are", names:ids(minions)}]};
+    // The Marionette thinks they're good: they don't learn the evil team, and the other Minions don't learn them.
+    case "minioninfo": return {sections:[{label:"The Demon is", names:ids(demon)}, {label:"The Minions (evil team) are", names:ids(minions.filter(q => q.char !== "marionette"))}]};
     case "demoninfo": return {sections:[{label:"Your Minions are", names:ids(minions)},
       ...(lunatic.length ? [{label:"The Lunatic (thinks they are the Demon) is", names:ids(lunatic)}] : []),
       {label:"These good characters are NOT in play. Safe to bluff as", tokens:state.bluffs.filter(Boolean)}]};
@@ -1449,8 +1479,13 @@ function pickBlock(s){
     if (hasRem(q, "Protected")) why.push(`${q.name}: Protected`);
     if (hasRem(q, "Safe")) why.push(`${q.name}: Safe`);
     const ef = effective(q);
-    if (["soldier","sailor","fool","tealady"].includes(ef?.id) && q.char === ef.id && !hasRem(q, "Poisoned")) why.push(`${q.name}: ${ef.name}`);
-    if (q.char === "mayor") why.push(`${q.name}: ${BY_ID.mayor.name} (someone else might die instead)`);
+    const ok = x => !hasRem(x, "Poisoned") && !x.reminders.some(r => r.startsWith("Drunk"));
+    if (["soldier","sailor","fool"].includes(ef?.id) && q.char === ef.id && ok(q) && !(ef.id === "fool" && hasRem(q, "Ability used"))) why.push(`${q.name}: ${ef.name}`);
+    // Tea Lady: her 2 alive neighbours can't die while both are good (she isn't protected herself).
+    const tl = aliveNeighbours(state.players.indexOf(q)).find(x => x.char === "tealady" && ok(x));
+    if (tl) { const tn = aliveNeighbours(state.players.indexOf(tl));
+      if (tn.length === 2 && tn.every(x => !isEvil(x))) why.push(`${q.name}: ${BY_ID.tealady.name} (${tl.name})`); }
+    if (q.char === "mayor" && ok(q)) why.push(`${q.name}: ${BY_ID.mayor.name} (someone else might die instead)`);
     return why;
   }) : [];
   return `<div class="pick-result"><p>📱 <b>They chose:</b> ${what}</p>
@@ -1485,12 +1520,20 @@ function statusMessages(){
   const msgs = [];
   if (!state.players.some(p => p.char)) return msgs;
   const alive = state.players.filter(p => p.alive);
-  const demonAlive = alive.some(p => charOf(p)?.team === "demon");
-  if (!demonAlive) msgs.push(["ok", "No living Demon: <b>Good wins</b>, unless the Scarlet Woman takes over (5+ players were alive when the Demon died)."]);
+  // A Zombuul that "died" once is still in the game.
+  const demonAlive = state.players.some(p => charOf(p)?.team === "demon" && (p.alive || hasRem(p, "Fake dead (Zombuul)")));
+  const working = p => !hasRem(p, "Poisoned") && !p.reminders.some(r => r.startsWith("Drunk"));
+  const mastermind = alive.find(p => p.char === "mastermind" && working(p));
+  const twins = state.players.filter(p => p.char === "eviltwin" || hasRem(p, "Twin"));
+  if (!demonAlive && mastermind && state.players.some(p => charOf(p)?.team === "demon" && hasRem(p, "Executed today")))
+    msgs.push(["warn", `The Demon was executed, but the ${esc(BY_ID.mastermind.name)} (${esc(mastermind.name)}) is alive: play one more day. Whoever is executed tomorrow, their team loses.`]);
+  else if (!demonAlive && inPlay("eviltwin") && twins.length >= 2 && twins.every(p => p.alive))
+    msgs.push(["warn", `No living Demon, but both twins are alive: good can't win while the ${esc(BY_ID.eviltwin.name)} and their twin live.`]);
+  else if (!demonAlive) msgs.push(["ok", "No living Demon: <b>Good wins</b>, unless the Scarlet Woman takes over (5+ players were alive when the Demon died)."]);
   else if (alive.length <= 2) msgs.push(["bad", "Only 2 players alive and the Demon is one of them: <b>Evil wins</b>."]);
   const saint = state.players.find(p => p.char === "saint" && !p.alive && hasRem(p, "Executed today"));
   if (saint) msgs.push(["bad", `The ${esc(BY_ID.saint.name)} (${esc(saint.name)}) was executed: <b>Evil wins</b>, unless they were poisoned.`]);
-  if (alive.length === 3 && alive.some(p => p.char === "mayor") && isDay()) msgs.push(["warn", "Mayor alive with 3 players left: if nobody is executed today, <b>Good wins</b>."]);
+  if (alive.length === 3 && alive.some(p => p.char === "mayor" && working(p)) && isDay()) msgs.push(["warn", "Mayor alive with 3 players left: if nobody is executed today, <b>Good wins</b>."]);
   return msgs;
 }
 
@@ -1503,7 +1546,7 @@ function nightSteps(){
   if (first) {
     if (ps.length >= 7) {
       steps.push({key:"minioninfo", order:sheetPos("minioninfo", 1), icon:"🧑‍🤝‍🧑", title:"Minion info",
-        text:`Wake all Minions (${namesWith(isEvil)}). Point to the Demon and let the Minions see each other.`});
+        text:`Wake all Minions (${namesWith(q => charOf(q)?.team === "minion" && q.char !== "marionette")}). Point to the Demon and let the Minions see each other.${ps.some(q => q.char === "marionette") ? " Don't wake the Marionette: they think they're good." : ""}`});
       const bl = state.bluffs.filter(Boolean).map(id => `${BY_ID[id].icon} ${BY_ID[id].name}`).join(", ") || "<i>none picked yet (Setup tab)</i>";
       const lun = ps.find(q => q.char === "lunatic");
       steps.push({key:"demoninfo", order:sheetPos("demoninfo", 2), icon:"😈", title:"Demon info",
@@ -1540,7 +1583,7 @@ function nightSteps(){
       case "investigator": hint.push("Minions in play: " + ps.filter(q => charOf(q)?.team === "minion").map(q => `${esc(BY_ID[q.char].name)} (${esc(q.name)})`).join(", ")); break;
       case "chef": hint.push(`True answer: ${evilPairs()}. A Recluse or Spy next to evil may change this.`); break;
       case "empath": { const nb = aliveNeighbours(idx); hint.push(`Alive neighbours: ${nb.map(q => esc(q.name)).join(" & ") || "none"}. True answer: ${nb.filter(isEvil).length}.`); break; }
-      case "fortuneteller": hint.push(`Demon: ${namesWith(isDemon)}. Red herring: ${namesWith(q => hasRem(q, "Red herring"))}.`); break;
+      case "fortuneteller": hint.push(`Demon: ${namesWith(isDemon)}. Red herring: ${namesWith(q => isRedHerring(q))}.`); break;
       case "undertaker": hint.push("Executed today: " + (ps.filter(q => hasRem(q, "Executed today")).map(q => `${esc(q.name)} → ${esc(charOf(q)?.name)}`).join(", ") || "nobody, so don't wake them")); break;
       case "imp": hint.push(`Can't kill: ${namesWith(q => hasRem(q, "Protected") || q.char === "soldier")}. If they pick the Mayor, you may kill someone else instead.`); break;
       // Bad Moon Rising
@@ -1563,7 +1606,9 @@ function nightSteps(){
       case "juggler": if (state.juggle?.[p.id] != null) hint.push(`Juggler got ${state.juggle[p.id]} right today.`); break;
       case "gossip": { const dd = state.days?.[state.phase - 1]; if (dd) hint.push(dd.gossipTrue?.includes(p.id) ? "The Gossip's statement today was TRUE: choose a player to die." : "The Gossip's statement today was not true: nobody dies from it."); break; }
     }
-    const truthful = !real?.thinks && !hasRem(p, "Poisoned") && !p.reminders.some(r => r.startsWith("Drunk"));
+    // Vortox: every Townsfolk's information is false.
+    const vortox = eff.team === "townsfolk" && ps.some(q => q.char === "vortox" && q.alive && !hasRem(q, "Poisoned") && !q.reminders.some(r => r.startsWith("Drunk")));
+    const truthful = !real?.thinks && !hasRem(p, "Poisoned") && !p.reminders.some(r => r.startsWith("Drunk")) && !vortox;
     steps.push({key:p.id, order, icon:eff.icon, title:eff.name, who:p.name, text:nightText(eff, first), flags, hint, skip, pid:p.id, effId:eff.id, truthful});
   });
   steps.push({key:"dawn", order:9999, icon:"☀️", title:"Dawn", text:"Wake everyone. Announce who died tonight, if anyone. Mark them dead in the Grimoire first."});
@@ -1588,7 +1633,7 @@ function viewSetup(){
     const okAll = !act.none && opts.some(exp => TEAMS.every(t => exp[t] === act[t]));
     const mods = state.players.map(charOf).filter(c => c?.setup).map(c => c.name);
     check = okAll ? `<div class="msg ok">✓ Character counts match the setup rules${mods.length ? ` (adjusted for ${esc(mods.join(", "))})` : ""}.</div>`
-      : `<div class="msg warn">⚠ Expected ${opts.map(exp => TEAMS.map(t => `${exp[t]} ${t}`).join(", ")).join(" <b>or</b> ")}. Current: ${TEAMS.map(t => `${act[t]} ${t}`).join(", ")}${act.none ? `, ${act.none} unassigned` : ""}.</div>`;
+      : `<div class="msg warn">⚠ Expected ${opts.map(exp => TEAMS.map(t => `${exp[t]} ${t}`).join(", ")).join(" or ")}. Current: ${TEAMS.map(t => `${act[t]} ${t}`).join(", ")}${act.none ? `, ${act.none} unassigned` : ""}.</div>`;
     const thinker = state.players.find(p => charOf(p)?.thinks && !p.drunkAs);
     if (thinker) check += `<div class="msg warn">⚠ Pick which character the ${esc(charOf(thinker).name)} thinks they are (click their seat).</div>`;
     state.players.map(charOf).filter(c => c?.special).forEach(c =>
@@ -1682,7 +1727,7 @@ function scriptCard(s){
     <span class="meter"><span>Storyteller</span>${dots(s.storyteller, "Storyteller difficulty")}</span>
     <p><b>Experience:</b> ${esc(s.experience)}</p>
     <p>${esc(s.blurb)}</p>
-    <p class="muted"><b>Twists:</b> ${esc(s.twists)}</p>
+    <p class="muted"><b>Twists:</b> ${esc(s.community ? communityTwists(s) : s.twists)}</p>
     <p class="muted">⏱ ${esc(s.time)} · ${counts} characters (T/O/M/D)</p>
   </button>`;
 }
@@ -1708,8 +1753,8 @@ function communityHtml(){
     ${list.length ? "" : `<div class="msg warn">data.js didn't load, so only the base scripts are available. Keep data.js next to index.html.</div>`}
     <div class="row"><label for="scriptFilter" class="inline">Show</label>
       <select id="scriptFilter" data-change="script-filter">${opt("all","All")}${opt("1","Beginner")}${opt("2","Intermediate")}${opt("3","Advanced")}${opt("4","Expert")}${opt("teensy","Teensyville (5–6 players)")}${opt("imported","Imported by me")}</select></div>
-    <table class="script-table"><thead><tr><th>Script</th><th>Type</th><th>Difficulty (est.)</th><th>T/O/M/D</th><th>Likes</th><th></th></tr></thead>
-      <tbody>${rows || `<tr><td colspan="6" class="muted">No scripts match.</td></tr>`}</tbody></table>
+    <div class="table-scroll"><table class="script-table"><thead><tr><th>Script</th><th>Type</th><th>Difficulty (est.)</th><th>T/O/M/D</th><th>Likes</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="6" class="muted">No scripts match.</td></tr>`}</tbody></table></div>
   </details>
   <details class="more" ${importMsg ? "open" : ""}>
     <summary>Import any script (JSON)</summary>
@@ -1909,10 +1954,13 @@ function blockState(d){
 function startNomination(d, byId, onId){
   const by = playerById(byId), on = playerById(onId);
   const nm = {by:byId, on:onId, order:voteOrder(onId), votes:{}, idx:0, need:votesNeeded(), done:false, spent:[]};
-  // Virgin: the first nomination uses the ability. A Townsfolk nominator is executed at once.
-  if (on.char === "virgin" && !hasRem(on, "Ability used")) {
-    toggleRem(on, "Ability used", true);
-    if (!hasRem(on, "Poisoned") && charOf(by)?.team === "townsfolk") nm.virgin = true;
+  // Virgin: the first nomination uses the ability. A Townsfolk nominator is executed at once;
+  // the Spy may register as a Townsfolk. Dead players have no ability.
+  if (on.char === "virgin" && on.alive && !hasRem(on, "Ability used")) {
+    toggleRem(on, "Ability used", true); nm.virginUsed = true;
+    const impaired = ["Poisoned", "Drunk", "Drunk until dusk", "Drunk (Courtier)"].some(r => hasRem(on, r));
+    if (!impaired && charOf(by)?.team === "townsfolk") nm.virgin = true;
+    else if (!impaired && by.char === "spy") nm.virginSpy = true;
   }
   // Witch: a Cursed player who nominates dies.
   if (hasRem(by, "Cursed")) nm.cursed = true;
@@ -1923,13 +1971,15 @@ function startNomination(d, byId, onId){
 function finishVote(nm){
   nm.done = true;
   // Dead players who raised a hand have now used their ghost vote.
-  nm.spent = Object.entries(nm.votes).filter(([id, v]) => v && !playerById(id)?.alive).map(([id]) => id);
+  nm.spent = Object.entries(nm.votes).filter(([id, v]) => v && playerById(id) && !playerById(id).alive).map(([id]) => id);
   nm.spent.forEach(id => { playerById(id).ghostVote = false; });
   logEvent("nom", {by:nm.by, on:nm.on, count:yesCount(nm), voters:Object.keys(nm.votes).filter(id => nm.votes[id])});
 }
 function deleteNomination(d, i){
   const nm = d.noms[i]; if (!nm) return;
   (nm.spent || []).forEach(id => { const q = playerById(id); if (q) q.ghostVote = true; });
+  // A nomination that is taken back never happened, so the Virgin keeps her ability.
+  if (nm.virginUsed) { const v = playerById(nm.on); if (v) toggleRem(v, "Ability used", false); }
   d.noms.splice(i, 1);
 }
 
@@ -1963,6 +2013,9 @@ function nominationsHtml(){
     if (nm.virgin) h += `<div class="msg bad">💥 ${nameOf(nm.by)} nominated the ${esc(BY_ID.virgin.name)} and is a Townsfolk: they are executed immediately, and the day ends.
       <div class="row"><button class="danger" data-action="day-execute" data-id="${nm.by}">⚖️ Execute ${nameOf(nm.by)} now</button>
       <button data-action="nom-flag-off" data-flag="virgin">Not this time (they don't register as Townsfolk)</button></div></div>`;
+    if (nm.virginSpy) h += `<div class="msg warn">🕵️ ${nameOf(nm.by)} is the Spy and nominated the ${esc(BY_ID.virgin.name)}. You may have the Spy register as a Townsfolk: they are executed immediately, and the day ends.
+      <div class="row"><button class="danger" data-action="day-execute" data-id="${nm.by}">⚖️ Execute ${nameOf(nm.by)} now</button>
+      <button data-action="nom-flag-off" data-flag="virginSpy">No, the Spy doesn't register as Townsfolk</button></div></div>`;
     if (nm.cursed) h += `<div class="msg bad">🧙 ${nameOf(nm.by)} was Cursed by the Witch and nominated: they die now.
       <div class="row"><button class="danger" data-action="nom-curse-kill" data-id="${nm.by}">💀 ${nameOf(nm.by)} dies</button>
       <button data-action="nom-flag-off" data-flag="cursed">Not this time</button></div></div>`;
@@ -2065,9 +2118,9 @@ const isNightPh = ph => ph > 0 && ph % 2 === 1;
 // ---------------------------------------------------------------------------
 const DAY_ABILITIES = {
   slayer:{once:true, kind:"pick", n:1, en:"Slayer shoots", ar:"قاتل الشياطين بيضرب", ask:"Who does the Slayer shoot?"},
-  psychopath:{kind:"pick", n:1, en:"Psychopath kills", ar:"السايكو بيقتل", ask:"Who does the Psychopath kill?"},
+  psychopath:{kind:"pick", n:1, perDay:true, en:"Psychopath kills", ar:"السايكو بيقتل", ask:"Who does the Psychopath kill?"},
   juggler:{once:true, kind:"juggle", en:"Juggler guesses", ar:"البهلوان بيخمّن"},
-  alsaahir:{kind:"many", en:"Alsaahir guesses the evil team", ar:"الساهر بيخمّن الأشرار", ask:"Who do they say are ALL the Minions and the Demon?"},
+  alsaahir:{kind:"many", perDay:true, en:"Alsaahir guesses the evil team", ar:"الساهر بيخمّن الأشرار", ask:"Who do they say are ALL the Minions and the Demon?"},
   gossip:{kind:"truth", perDay:true, en:"Gossip made a statement", ar:"الرغّاي قال جملة"},
   artist:{once:true, kind:"used", en:"Artist asked their question", ar:"الفنّان سأل سؤاله"},
   fisherman:{once:true, kind:"used", en:"Fisherman got advice", ar:"الصيّاد خد نصيحة"},
@@ -2103,7 +2156,7 @@ function dayAbilitiesHtml(){
     const a = it.a, p = it.p;
     h += `<div class="vote-box"><p class="vote-title">${esc(BY_ID[it.id]?.icon || "🎯")} ${esc(p.name)}: ${esc(isAr() ? a.ar : a.en)}</p>`;
     if (a.kind === "pick" || a.kind === "many") {
-      h += `<p class="muted">${esc(a.ask)}</p><div class="pick-grid">${state.players.filter(q => q.id !== p.id || a.kind === "many").map(q =>
+      h += `<p class="muted">${esc(a.ask)}</p><div class="pick-grid">${state.players.filter(q => (q.id !== p.id || a.kind === "many") && (!a.dead || q.alive)).map(q =>
         `<button class="pick-btn" data-action="ab-sel" data-id="${q.id}" aria-pressed="${open.sel.includes(q.id)}">${q.alive ? "" : "💀 "}${esc(q.name)}</button>`).join("")}</div>
         <div class="row"><button class="primary big" data-action="ab-go" ${open.sel.length && (a.kind === "many" || open.sel.length === a.n) ? "" : "disabled"}>✅ Confirm</button>
         <button data-action="ab-cancel">Cancel</button></div>`;
@@ -2154,7 +2207,7 @@ function resolveDayAbility(d, open, v){
     }
     case "damselguess": {
       toggleRem(p, "Guess Used", true);
-      const right = t.char === "damsel";
+      const right = t.char === "damsel" && abilityWorks(t);
       log(`guessed ${t.name} as the Damsel: ${right ? "correct" : "wrong"}`, `خمّن إن ${t.name} هي الآنسة: ${right ? "صح" : "غلط"}`);
       return right ? {cls:"bad", html:`👰 ${ar ? "صح! الأشرار كسبوا." : "Correct! Evil wins."}`, buttons:`<button class="primary" data-action="end-game" data-v="evil">🏁 ${ar ? "خلّص اللعبة: الأشرار كسبوا" : "End game: Evil wins"}</button>`}
         : {cls:"warn", html:`👰 ${ar ? "غلط. محصلش حاجة." : "Wrong. Nothing happens."}`};
@@ -2192,7 +2245,7 @@ function resolveDayAbility(d, open, v){
 // Discussion timer (not saved; lives while the page is open)
 // ---------------------------------------------------------------------------
 let timer = {total:180, left:180, running:false, endAt:0, done:false, int:null};
-const fmtTime = s => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.max(0, Math.ceil(s) % 60)).padStart(2, "0")}`;
+const fmtTime = s => { const t = Math.ceil(Math.max(0, s)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`; };
 function suggestedMinutes(){ const n = aliveCount(); return n >= 10 ? 5 : n >= 7 ? 3 : 2; }
 function timerTick(){
   if (timer.running) {
@@ -2227,7 +2280,8 @@ function timerHtml(){
 // ---------------------------------------------------------------------------
 let revealOpen = false;
 function suggestedWinner(){
-  const m = statusMessages().map(([, t]) => t).join(" ");
+  // Warnings describe what COULD happen (e.g. the Mayor), so only real results count.
+  const m = statusMessages().filter(([k]) => k !== "warn").map(([, t]) => t).join(" ");
   return /Good wins/.test(m) ? "good" : /Evil wins/.test(m) ? "evil" : null;
 }
 function revealHtml(){
@@ -2279,8 +2333,11 @@ function viewLog(){
 const HISTORY_KEY = "botc-grimoire-history-v1";
 const HISTORY_MAX = 200;
 let pastOpen = null; // id of the past game being viewed
-function loadHistory(){ try { return JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; } catch { return []; } }
-function saveHistory(h){ localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX))); }
+function loadHistory(){
+  let h; try { h = JSON.parse(localStorage.getItem(HISTORY_KEY)); } catch { backupCorrupt(HISTORY_KEY); return []; }
+  return Array.isArray(h) ? h.filter(g => g && g.id && Array.isArray(g.players)) : [];
+}
+function saveHistory(h){ safeSet(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX))); }
 const gameStarted = () => state.phase > 0 || (state.log || []).length > 0;
 function archiveCurrent(){
   if (!gameStarted() || !state.players.some(p => p.char)) return;
@@ -2400,7 +2457,7 @@ function viewTips(){
     <div class="meter" style="max-width:320px"><span>Players</span>${dots(s.players, "Player difficulty")}</div>
     <div class="meter" style="max-width:320px"><span>Storyteller</span>${dots(s.storyteller, "Storyteller difficulty")}</div>
     <p><b>Experience needed:</b> ${esc(s.experience)}</p>
-    <p>${esc(s.blurb)} <b>Twists:</b> ${esc(s.twists)}</p>
+    <p>${esc(s.blurb)} <b>Twists:</b> ${esc(s.community ? communityTwists(s) : s.twists)}</p>
     ${s.tips.length ? `<h3>Storyteller tips for this script</h3><ul>${s.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
     </section>`;
   return scriptPanel + `<section class="panel"><h2>Storyteller guide for a first game</h2>
@@ -2460,6 +2517,8 @@ function render(){
     else $("#overlay .prompt-what")?.closest(".overlay")?.querySelector(".pick-btn, [data-action='p-yesno']")?.focus({preventScroll:true});
   } else if (reveal || showing || (revealOpen && state.ended) || pastOpen) $("#overlay button")?.focus();
   else if (refocus) { document.querySelector(`#view ${refocus}`)?.focus({preventScroll:true}); refocus = null; }
+  // On a phone the seat editor sits below the circle: bring it into view after a tap.
+  if (scrollToEditor) { scrollToEditor = false; if (window.matchMedia?.("(max-width:900px)").matches) document.querySelector(".grim aside")?.scrollIntoView?.({block:"nearest", behavior:"smooth"}); }
   timerTick(); // refresh the timer text and the header indicator
   save();
 }
@@ -2519,7 +2578,7 @@ document.addEventListener("click", e => {
     case "start-game":
       if (gameStarted()) resetGameFlags(); // restarting: the earlier game goes to Past games
       state.done = {}; state.phase = 0; state.gameId = uid(); state.gameStart = Date.now();
-      setPhase(1); tab = "night"; break;
+      ensureRedHerring(); setPhase(1); tab = "night"; break;
     case "reset":
       if (!confirm("Erase all seats, characters and notes?")) return;
       archiveCurrent(); // the game in progress is kept in Past games
@@ -2542,10 +2601,10 @@ document.addEventListener("click", e => {
       if (isFree()) freezePositions(); // start from where the seats are now
       break;
     case "layout-reset": state.players.forEach(p => { delete p.x; delete p.y; }); state.layout = "circle"; break;
-    case "next-phase": setPhase(state.phase + 1); if (tab === "setup") tab = "night"; break;
+    case "next-phase": if (state.phase === 0) ensureRedHerring(); setPhase(state.phase + 1); if (tab === "setup") tab = "night"; break;
     case "prev-phase": setPhase(state.phase - 1); break;
     case "toggle-hide": state.hidden = !state.hidden; break;
-    case "select": selected = selected === b.dataset.id ? null : b.dataset.id; break;
+    case "select": selected = selected === b.dataset.id ? null : b.dataset.id; if (selected) scrollToEditor = true; break;
     case "toggle-alive":
       p.alive = !p.alive;
       if (!p.alive && isNight()) toggleRem(p, "Died tonight", true);
@@ -2561,12 +2620,21 @@ document.addEventListener("click", e => {
     case "add-seat":
       if (state.players.length >= 15) { alert("This script supports up to 15 players."); return; }
       state.players.push({id:uid(), name:`Player ${state.players.length + 1}`, char:null, drunkAs:null, alive:true, ghostVote:true, reminders:[]}); break;
-    case "remove-seat": if (!confirm(`Remove ${p.name}?`)) return; state.players = state.players.filter(q => q !== p); selected = null; break;
+    case "remove-seat": {
+      if (!confirm(`Remove ${p.name}?`)) return;
+      state.players = state.players.filter(q => q !== p); selected = null;
+      // Drop the seat from today's voting too, so nothing points at a missing player.
+      Object.values(state.days || {}).forEach(d => d.noms.forEach(n => { n.order = n.order.filter(x => x !== p.id); delete n.votes[p.id]; }));
+      break;
+    }
     case "execute": case "day-execute": {
       const t = playerById(a === "execute" ? $("#execSel").value : b.dataset.id); if (!t) return;
       const d = dayState();
-      // A Virgin execution happens mid-nomination: close that nomination first.
-      const open = d.noms.find(n => !n.done); if (open) d.noms.splice(d.noms.indexOf(open), 1);
+      // A Virgin execution happens mid-nomination: keep it as a finished nomination (so an undo
+      // can't repeat it); any other open nomination is dropped.
+      const open = d.noms.find(n => !n.done);
+      if (open && (open.virgin || open.virginSpy)) { open.done = true; open.votes = {}; open.virgin = open.virginSpy = false; }
+      else if (open) d.noms.splice(d.noms.indexOf(open), 1);
       d.executed = t.id; d.executedWasAlive = t.alive;
       t.alive = false; toggleRem(t, "Executed today", true); break;
     }
@@ -2581,14 +2649,14 @@ document.addEventListener("click", e => {
     case "nom-on": startNomination(dayState(), dayState().pickBy, b.dataset.id); break;
     case "nom-cancel": {
       const d = dayState(), open = d.noms.find(n => !n.done);
-      if (open) d.noms.splice(d.noms.indexOf(open), 1);
+      if (open) deleteNomination(d, d.noms.indexOf(open));
       d.stage = null; d.pickBy = null; break;
     }
     case "nom-delete": if (!confirm("Delete this nomination? Any ghost votes used are given back.")) return; deleteNomination(dayState(), +b.dataset.i); break;
     case "nom-flag-off": { const open = dayState().noms.find(n => !n.done); if (open) open[b.dataset.flag] = false; break; }
     case "nom-curse-kill": {
       const q = playerById(b.dataset.id); if (q) q.alive = false;
-      const open = dayState().noms.find(n => !n.done); if (open) open.cursed = false; break;
+      const open = dayState().noms.find(n => !n.done); if (open) { open.cursed = false; open.need = votesNeeded(); } break;
     }
     case "vote": {
       const nm = dayState().noms.find(n => !n.done); if (!nm) return;
@@ -2683,7 +2751,7 @@ document.addEventListener("change", e => {
     case "bluff": state.bluffs[+el.dataset.i] = el.value || null; break;
     case "notes": state.notes = el.value; save(); return;
     case "p-name": p.name = el.value.trim() || p.name; break;
-    case "p-char": p.char = el.value || null; if (!BY_ID[p.char]?.thinks) p.drunkAs = null; break;
+    case "p-char": { const nc = el.value || null; if (nc !== p.char) p.drunkAs = null; p.char = nc; break; }
     case "p-drunk": p.drunkAs = el.value || null; break;
     case "p-rem": toggleRem(p, el.dataset.rem, el.checked); break;
     case "step": state.done[el.dataset.key] = el.checked; break;
@@ -2711,7 +2779,7 @@ const reorderedIds = (id, target) => { const ids = state.players.map(p => p.id).
 
 document.addEventListener("pointerdown", e => {
   const seat = e.target.closest(".circle .seat");
-  if (!seat || e.button !== 0 || state.players.length < 2) return;
+  if (drag || !seat || e.button !== 0 || state.players.length < 2) return; // one drag at a time
   drag = {id:seat.dataset.id, seat, circle:seat.closest(".circle"), x:e.clientX, y:e.clientY, moved:false, target:null, pointerId:e.pointerId};
 });
 
