@@ -63,7 +63,8 @@
   .seat.minion { background:var(--minion-bg); color:var(--minion); border-color:var(--minion); }
   .seat.demon { background:var(--demon-bg); color:var(--demon); border-color:var(--demon); }
   .seat.dead { opacity:.6; border-style:dashed; }
-  .circle .seat { touch-action:none; user-select:none; -webkit-user-select:none; cursor:grab; transition:left .18s ease, top .18s ease; }
+  .circle .seat { touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; cursor:grab; transition:left .18s ease, top .18s ease; }
+  .circle .seat.armed { outline:3px solid var(--accent); outline-offset:2px; transform:translate(-50%,-50%) scale(1.06); }
   .circle .seat.dragging { z-index:10; cursor:grabbing; transition:none; box-shadow:0 8px 24px rgba(0,0,0,.3); }
   .circle.free { border:2px dashed var(--border); border-radius:24px; }
   .circle.free .seat { transition:none; }
@@ -230,6 +231,8 @@
     header { position:static; }
   }
   .table-scroll { overflow-x:auto; }
+  .touch-only { display:none; }
+  @media (pointer:coarse) { .touch-only { display:inline; } }
   @media (pointer:coarse) { button { min-height:44px; } input[type=checkbox] { width:20px; height:20px; } }
   @media print {
     header, nav, .no-print { display:none !important; }
@@ -674,7 +677,7 @@ function makeScript(meta){
   const est = estimateDifficulty(chars, teensy);
   const exp = chars.filter(c => !["tb","bmr","snv"].includes(c.edition)).map(c => c.name);
   const expIds = chars.filter(c => !["tb","bmr","snv"].includes(c.edition)).map(c => c.id);
-  const rem = ["Poisoned","Drunk","Safe","Died tonight","Executed today","Ability used"];
+  const rem = ["Poisoned","Drunk","Safe","Died tonight","Executed today","Ability used","Became Demon"];
   chars.forEach(c => (c.officialReminders || []).forEach(r => { if (!rem.includes(r)) rem.push(r); }));
   return {...meta, ...est, icon:teensy ? "🏘️" : "📜", chars, sheet:true, community:true, extras, expIds, unknown,
     time:teensy ? "30–45 min" : "60–120 min",
@@ -1203,7 +1206,7 @@ function makeAdvice(s, ch){
 }
 
 // Cards for steps that aren't "information abilities" but still need showing.
-function stepCard(stepKey){
+function stepCard(stepKey, pid){
   const ps = state.players;
   const minions = ps.filter(q => charOf(q)?.team === "minion"), demon = ps.filter(isDemon);
   const lunatic = ps.filter(q => q.char === "lunatic");
@@ -1213,7 +1216,11 @@ function stepCard(stepKey){
     case "demoninfo": return {sections:[{label:"Your Minions are", names:ids(minions)},
       ...(lunatic.length ? [{label:"The Lunatic (thinks they are the Demon) is", names:ids(lunatic)}] : []),
       {label:"These good characters are NOT in play. Safe to bluff as", tokens:state.bluffs.filter(Boolean)}]};
-    case "becomeimp": return {sections:[{label:"You are now the", token:"imp"}, {label:"You are evil, and now the Demon."}]};
+    case "becomeimp": {
+      // Show the player's actual Demon (Scarlet Woman takeover), or the Imp for a star-pass.
+      const p = playerById(pid), tok = isDemon(p) ? p.char : "imp";
+      return {sections:[{label:"You are now the", token:tok}, {label:"You are evil, and now the Demon."}]};
+    }
   }
   return null;
 }
@@ -1223,7 +1230,8 @@ function stepCardButtons(s){
   if (STEP_CARD_LABEL[s.key]) return `<p class="row"><button class="primary" data-action="show-step" data-step="${s.key}">${STEP_CARD_LABEL[s.key]}</button></p>`;
   if (s.skip || !s.pid) return "";
   const extra = [];
-  if (s.effId === "scarletwoman") extra.push(`<button class="primary" data-action="show-step" data-step="becomeimp">📱 Show "You are now the Imp"</button>`);
+  const sp = playerById(s.pid);
+  if (sp && hasRem(sp, "Became Demon") && isDemon(sp)) extra.push(`<button class="primary" data-action="show-step" data-step="becomeimp" data-pid="${sp.id}">📱 Show "You are now the ${esc(BY_ID[sp.char].name)}"</button>`);
   if (s.effId === "imp") extra.push(`<button data-action="show-step" data-step="becomeimp">📱 If the Imp killed themselves: show the new Imp</button>`);
   if (s.effId === "spy" || s.effId === "widow") extra.push(`<button data-action="spy-grimoire">📱 Open the Grimoire for them</button>`);
   // Anything else to show: use "📱 Show something" in the top bar.
@@ -1510,7 +1518,11 @@ function setPhase(next){
   const forward = next > state.phase;
   state.phase = next;
   if (forward && isNight()) clearRem(SCRIPT.nightClear);
-  if (forward && isDay()) clearRem(["Executed today"]);
+  if (forward && isDay()) {
+    clearRem(["Executed today"]);
+    // "Became Demon" lasts until the new Demon has been woken on the following night.
+    state.players.forEach(p => { if (hasRem(p, "Became Demon") && state.phase - 1 > (p.becameDemonPh ?? -1)) toggleRem(p, "Became Demon", false); });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1525,7 +1537,12 @@ function statusMessages(){
   const working = p => !hasRem(p, "Poisoned") && !p.reminders.some(r => r.startsWith("Drunk"));
   const mastermind = alive.find(p => p.char === "mastermind" && working(p));
   const twins = state.players.filter(p => p.char === "eviltwin" || hasRem(p, "Twin"));
-  if (!demonAlive && mastermind && state.players.some(p => charOf(p)?.team === "demon" && hasRem(p, "Executed today")))
+  // Scarlet Woman: the Demon died with 5+ players alive (4+ still alive now), so she becomes the Demon.
+  const sw = alive.find(p => p.char === "scarletwoman" && working(p));
+  if (!demonAlive && sw && alive.length >= 4)
+    msgs.push(["warn", `The Demon died with 5 or more players alive: the ${esc(BY_ID.scarletwoman.name)} (${esc(sw.name)}) becomes the Demon.
+      <div class="row"><button class="primary" data-action="sw-takeover" data-id="${sw.id}">💋 ${esc(sw.name)} becomes the Demon</button></div>`]);
+  else if (!demonAlive && mastermind && state.players.some(p => charOf(p)?.team === "demon" && hasRem(p, "Executed today")))
     msgs.push(["warn", `The Demon was executed, but the ${esc(BY_ID.mastermind.name)} (${esc(mastermind.name)}) is alive: play one more day. Whoever is executed tomorrow, their team loses.`]);
   else if (!demonAlive && inPlay("eviltwin") && twins.length >= 2 && twins.every(p => p.alive))
     msgs.push(["warn", `No living Demon, but both twins are alive: good can't win while the ${esc(BY_ID.eviltwin.name)} and their twin live.`]);
@@ -1573,6 +1590,7 @@ function nightSteps(){
     if (eff.once && hasRem(p, "Ability used")) { skip = true; flags.push("Ability already used: skip."); }
     if (!p.alive && !eff.wakesDead) flags.push("Dead: skip.");
     if (real?.thinks) flags.push(real.thinksNote);
+    if (hasRem(p, "Became Demon") && isDemon(p)) flags.push("Just became the Demon: wake them and show them their new character first.");
     if (hasRem(p, "Poisoned")) flags.push("Poisoned: ability does nothing tonight. You may give false info.");
     if (p.reminders.some(r => r.startsWith("Drunk"))) flags.push("Drunk: ability does nothing tonight. You may give false info.");
     if (eff.team === "townsfolk" && inPlay("vortox")) flags.push("Vortox in play: this player's info must be false.");
@@ -1884,7 +1902,7 @@ function viewGrimoire(){
         ${ringSvg()}
         <div class="center"><strong>${phaseLabel()}</strong>${aliveCount()} of ${n} alive<br>Votes to execute: ${votesNeeded()}+<br><small>${isFree()
           ? "Drag seats anywhere. Numbers and the dashed line show clockwise order."
-          : "Drag seats to reorder them"}</small></div>
+          : "Drag seats to reorder them"} <span class="touch-only">On a phone, press and hold a seat first.</span></small></div>
         ${state.players.map((p, i) => seatHtml(p, i, n)).join("")}
       </div>
       ${statusMessages().map(([k, t]) => `<div class="msg ${k}">${t}</div>`).join("")}
@@ -2397,7 +2415,7 @@ function viewDay(msgs){
   if (inPlay("saint")) special.push(`🗄️ ${nm2("saint")} in play: if they're executed, evil wins.`);
   const master = state.players.find(p => hasRem(p, "Master"));
   if (master) special.push(`🕶️ The ${nm2("butler")} may only vote if ${esc(master.name)} votes too.`);
-  if (inPlay("scarletwoman")) special.push(`🔁 If the Demon dies while 5+ players are alive, the ${nm2("scarletwoman")} becomes the Demon. Swap their token and mark them Became Demon.`);
+  if (inPlay("scarletwoman")) special.push(`🔁 If the Demon dies while 5+ players are alive, the ${nm2("scarletwoman")} becomes the Demon. The status box offers a button that swaps their token for you.`);
   state.players.forEach(p => { const c = charOf(p); if (c?.dayNote && p.alive) special.push(`${c.icon} ${esc(c.name)} (${esc(p.name)}) ${esc(c.dayNote)}`); });
   const cursed = state.players.filter(p => hasRem(p, "Cursed"));
   if (cursed.length) special.push(`🧙 Cursed by the Witch: ${cursed.map(p => esc(p.name)).join(", ")}. If they nominate today, they die.`);
@@ -2720,7 +2738,14 @@ document.addEventListener("click", e => {
     case "reveal-close": revealOpen = false; break;
     case "reroll": delete state.advice[b.dataset.key]; break;
     case "show-card": showing = state.advice[b.dataset.key]?.card || null; break;
-    case "show-step": showing = stepCard(b.dataset.step); break;
+    case "show-step": showing = stepCard(b.dataset.step, b.dataset.pid); break;
+    case "sw-takeover": {
+      const sw = playerById(b.dataset.id); if (!sw) return;
+      const dead = state.players.filter(q => isDemon(q) && !q.alive);
+      const old = dead.find(q => hasRem(q, "Executed today") || hasRem(q, "Died tonight")) || dead[0];
+      sw.char = old?.char || "imp"; sw.drunkAs = null; sw.becameDemonPh = state.phase;
+      toggleRem(sw, "Became Demon", true); break;
+    }
     case "show-done": showing = null; break;
     case "spy-grimoire": state.hidden = false; tab = "grimoire"; break;
     case "print": window.print(); return;
@@ -2775,16 +2800,27 @@ document.addEventListener("change", e => {
 // The dragged seat follows the pointer; the others slide to preview the new order.
 // ---------------------------------------------------------------------------
 let drag = null, suppressClick = false;
+const LONG_PRESS_MS = 400;
 const reorderedIds = (id, target) => { const ids = state.players.map(p => p.id).filter(x => x !== id); ids.splice(target, 0, id); return ids; };
 
 document.addEventListener("pointerdown", e => {
   const seat = e.target.closest(".circle .seat");
   if (drag || !seat || e.button !== 0 || state.players.length < 2) return; // one drag at a time
-  drag = {id:seat.dataset.id, seat, circle:seat.closest(".circle"), x:e.clientX, y:e.clientY, moved:false, target:null, pointerId:e.pointerId};
+  // Touch: press and hold to pick a seat up, so a normal swipe still scrolls the page.
+  const touch = e.pointerType === "touch";
+  drag = {id:seat.dataset.id, seat, circle:seat.closest(".circle"), x:e.clientX, y:e.clientY, moved:false, target:null, pointerId:e.pointerId, armed:!touch};
+  if (touch) drag.timer = setTimeout(() => {
+    if (!drag || drag.seat !== seat) return;
+    drag.armed = true; seat.classList.add("armed"); navigator.vibrate?.(30);
+  }, LONG_PRESS_MS);
 });
 
 document.addEventListener("pointermove", e => {
   if (!drag || e.pointerId !== drag.pointerId) return;
+  if (!drag.armed) { // finger moved before the hold finished: it's a scroll, not a drag
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 10) { clearTimeout(drag.timer); drag = null; }
+    return;
+  }
   if (!drag.moved) {
     if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return; // a tap, not a drag
     drag.moved = true;
@@ -2816,6 +2852,7 @@ document.addEventListener("pointermove", e => {
 function endDrag(e, cancel){
   if (!drag || e.pointerId !== drag.pointerId) return;
   const d = drag; drag = null;
+  clearTimeout(d.timer); d.seat.classList.remove("armed");
   if (!d.moved) return; // plain click: let the normal select handler run
   suppressClick = true; setTimeout(() => { suppressClick = false; }, 300);
   if (!cancel && isFree() && d.px != null) {
@@ -2827,6 +2864,10 @@ function endDrag(e, cancel){
 }
 document.addEventListener("pointerup", e => endDrag(e, false));
 document.addEventListener("pointercancel", e => endDrag(e, true));
+// Once a seat is picked up by touch, stop the page from scrolling under the finger,
+// and stop the long-press menu from opening on it.
+document.addEventListener("touchmove", e => { if (drag?.armed && e.cancelable) e.preventDefault(); }, {passive:false});
+document.addEventListener("contextmenu", e => { if (e.target.closest?.(".circle .seat")) e.preventDefault(); });
 // Swallow the click that follows a drag so it doesn't also select the seat.
 document.addEventListener("click", e => { if (suppressClick) { suppressClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
 
