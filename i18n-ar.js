@@ -329,7 +329,7 @@ window.BOTC_AR = (() => {
     // Header & tabs
     "Setup":"التجهيز", "◀ Back":"▶ رجوع", "Next phase ▶":"المرحلة الجاية ◀", "Hide grimoire":"خبّي الكتاب", "Show grimoire":"ورّي الكتاب",
     "Deal":"التوزيع", "Grimoire":"كتاب الراوي", "Night & Day":"الليل والنهار", "Script sheet":"ورقة السكريبت", "Beginner guide":"دليل المبتدئين",
-    "Sections":"الأقسام", "Previous phase":"المرحلة اللي فاتت",
+    "Sections":"الأقسام", "Previous phase":"المرحلة اللي فاتت", "Next phase":"المرحلة الجاية", "Next":"الجاية",
     "Beginner":"مبتدئ", "Intermediate":"متوسط", "Advanced":"متقدّم", "Expert":"خبير",
     // Setup: script
     "0. Script":"0. السكريبت",

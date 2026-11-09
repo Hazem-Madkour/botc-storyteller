@@ -23,6 +23,16 @@
   body { margin:0; font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
   header { position:sticky; top:0; z-index:5; background:var(--panel); color:var(--text); border-bottom:1px solid var(--border); padding:10px 16px; display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; }
   header h1 { font-size:18px; margin:0; }
+  .hdr-btns { display:flex; flex-wrap:nowrap; gap:6px; margin:0; min-width:0; }
+  .hdr-btns button { white-space:nowrap; }
+  .hdr-btns .short { display:none; }
+  .arrow-back::before { content:"◀"; } .arrow-next::before { content:"▶"; }
+  [dir="rtl"] .arrow-back::before { content:"▶"; } [dir="rtl"] .arrow-next::before { content:"◀"; }
+  @media (max-width:600px) {
+    .hdr-btns { width:100%; }
+    .hdr-btns .full { display:none; } .hdr-btns .short { display:inline; }
+    .hdr-btns button { flex:1 1 0; padding-inline:6px; }
+  }
   .phase { font-weight:700; padding:4px 10px; border-radius:999px; background:var(--good-bg); color:var(--good); }
   .phase.night { background:var(--demon-bg); color:var(--demon); }
   .stats { color:var(--muted); }
@@ -249,18 +259,19 @@
   <span id="phase" class="phase" aria-live="polite"></span>
   <span id="stats" class="stats" aria-live="polite"></span>
   <button id="timerHdr" class="timer-hdr" data-action="tab" data-tab="night" hidden title="Discussion timer"></button>
-  <div class="row" style="margin:0">
-    <button data-action="prev-phase" aria-label="Previous phase">◀ Back</button>
-    <button data-action="next-phase" class="primary">Next phase ▶</button>
-    <button data-action="compose" data-blank="1" title="Show any message, player, character or number on the phone">📱 Show something</button>
+  <!-- One line of buttons: on narrow screens the labels shorten instead of wrapping. -->
+  <div class="hdr-btns">
+    <button data-action="prev-phase" aria-label="Previous phase"><span class="full">◀ Back</span><span class="short arrow-back" aria-hidden="true"></span></button>
+    <button data-action="next-phase" class="primary" aria-label="Next phase"><span class="full">Next phase ▶</span><span class="short" aria-hidden="true">Next <span class="arrow-next"></span></span></button>
+    <button data-action="compose" data-blank="1" title="Show any message, player, character or number on the phone" aria-label="Show something"><span class="full">📱 Show something</span><span class="short" aria-hidden="true">📱</span></button>
     <button data-action="toggle-hide" id="hideBtn"></button>
-    <button data-action="toggle-lang" id="langBtn" class="no-tr"></button>
   </div>
 </header>
 <nav role="tablist" aria-label="Sections" id="tabs"></nav>
 <main id="view"></main>
 <div id="overlay"></div>
 <footer class="muted no-print" style="text-align:center;font-size:12px;padding:8px 16px 20px">
+  <p style="margin:0 0 8px"><button data-action="toggle-lang" id="langBtn" class="no-tr"></button></p>
   Unofficial fan tool. Blood on the Clocktower and its character data are © The Pandemonium Institute, used under their
   <a href="https://release.botc.app/resources/" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Community Created Content policy</a>.
   Community scripts from <a href="https://www.botcscripts.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">botcscripts.com</a>.
@@ -2510,7 +2521,9 @@ function render(){
   const lv = $("#scriptLevel"); lv.textContent = SCRIPT.levelLabel; lv.className = `level level-${SCRIPT.level}`;
   const ph = $("#phase"); ph.textContent = phaseLabel(); ph.className = "phase" + (isNight() ? " night" : "");
   $("#stats").textContent = state.players.length ? `${aliveCount()}/${state.players.length} alive · ${votesNeeded()}+ votes to execute` : "";
-  $("#hideBtn").textContent = state.hidden ? "👁️ Show grimoire" : "🙈 Hide grimoire";
+  const hb = $("#hideBtn"), hideLabel = state.hidden ? "Show grimoire" : "Hide grimoire", hideIcon = state.hidden ? "👁" : "🙈";
+  hb.innerHTML = `<span class="full">${hideIcon} ${hideLabel}</span><span class="short" aria-hidden="true">${hideIcon}</span>`;
+  hb.setAttribute("aria-label", hideLabel);
   $("#hideBtn").setAttribute("aria-pressed", String(state.hidden));
   $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-action="tab" data-tab="${k}">${l}</button>`).join("");
   trackChanges(); // log deaths, executions, character and phase changes
