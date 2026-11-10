@@ -854,7 +854,7 @@ window.BOTC_AR = (() => {
   // Script names: translated for meaning (and fun), not just sounded out. The English
   // original is still shown underneath so it can be found on botcscripts.com.
   const scriptNames = {
-    tb:"الشر على نار هادية", bmr:"ليلة نحس", snv:"طوايف وبنفسج",
+    tb:"الشر على نار هادية", bmr:"ليلة نحس", snv:"شلّة الياسمين",
     "c-3":"صيد القراميط", "c-42":"الوصلة", "c-76":"سيبه على راحته", "c-4669":"ولا حد يتحرّك!",
     "c-491":"متاهة أبو قرون", "c-77":"فرحة ما بعدها فرحة", "c-65":"علقة الشك", "c-104":"واحة نُص الليل",
     "c-441":"تهديد من تحت لتحت", "c-1945":"أي حد يقدر يلعب", "c-754":"ثق فيّا", "c-372":"تار هارولد هولت",
