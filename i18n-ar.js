@@ -298,7 +298,7 @@ window.BOTC_AR = (() => {
       blurb:"السكريبت الرسمي للمبتدئين. قدرات معلومات واضحة وشيطان واحد بس، العفريت.",
       twists:"السكران والجاسوس بس هما اللي فيهم لفّ ودوران."},
     bmr: {levelLabel:"متوسط", time:"75–120 دقيقة",
-      experience:"العبوا «المشاكل بتغلي» مرتين أو تلاتة الأول.",
+      experience:"العبوا «الشر على نار هادية» مرتين أو تلاتة الأول.",
       blurb:"لعبة دمويّة أكتر. موت كتير وحماية كتير، ومعظم المعلومات بتيجي من مين بيموت ومين بيعيش.",
       twists:"أربع شياطين مختلفين جدًا، والمجنون اللي فاكر نفسه الشيطان، واليوم الزيادة بتاع العقل المدبّر.",
       tips:[
@@ -310,7 +310,7 @@ window.BOTC_AR = (() => {
         "المجنون: صحّيه كأنه الشيطان كل ليلة. وبعدين قول للشيطان الحقيقي المجنون اختار مين.",
         "البلطجي: أول لاعب يختاره كل ليلة بيبقى سكران، والبلطجي بياخد فريق اللاعب ده."]},
     snv: {levelLabel:"متقدّم", time:"75–120 دقيقة",
-      experience:"العبوا «المشاكل بتغلي» الأول، والأحسن «القمر المشؤوم طالع» كمان. أحسن مع راوي واثق من نفسه.",
+      experience:"العبوا «الشر على نار هادية» الأول، والأحسن «ليلة نحس» كمان. أحسن مع راوي واثق من نفسه.",
       blurb:"سكريبت كله ألغاز مبني على الإصرار (لاعيبة لازم يفضلوا مصمّمين إنهم شخصيات معيّنة) وتغيير الشخصيات. الطيبين بياخدوا معلومات كتير، بس كتير منها ممكن يبقى غلط.",
       twists:"الإصرار (السيرينوفوس، المتحوّل)، تبديل الشخصيات (الشمطاء، الحلّاق، الحاوي)، والفورتوكس اللي بيخلّي كل معلومات أهل البلد غلط.",
       tips:[
@@ -344,7 +344,7 @@ window.BOTC_AR = (() => {
     "View on botcscripts.com":"شوفه على botcscripts.com",
     "Difficulty is estimated from the characters on the script.":"الصعوبة محسوبة تقريبًا من الشخصيات اللي في السكريبت.",
     "Only characters from the three base scripts.":"شخصيات من السكريبتات الأساسية التلاتة بس.",
-    "No experience needed.":"مش محتاج خبرة.", "Play Trouble Brewing a couple of times first.":"العبوا «المشاكل بتغلي» كام مرة الأول.",
+    "No experience needed.":"مش محتاج خبرة.", "Play Trouble Brewing a couple of times first.":"العبوا «الشر على نار هادية» كام مرة الأول.",
     "Best for groups who know the three base scripts.":"أحسن للمجموعات اللي عارفة السكريبتات الأساسية التلاتة.",
     "For experienced players with a confident Storyteller.":"للاعيبة اللي عندهم خبرة مع راوي واثق من نفسه.",
     "Built for 5 or 6 players.":"معمول لـ 5 أو 6 لاعيبة.",
@@ -440,7 +440,7 @@ window.BOTC_AR = (() => {
     "Copy JSON":"انسخ JSON", "Copied ✓":"اتنسخ ✓", "Jinxes (special rules when both are in play)":"قواعد خاصة لما الشخصيتين يبقوا في اللعبة مع بعض",
     // Guide
     "Storyteller tips for this script":"نصايح للراوي في السكريبت ده",
-    "This general guide is written for Trouble Brewing. Most of it still applies.":"الدليل العام ده مكتوب لـ«المشاكل بتغلي». معظمه ينفع برضه.",
+    "This general guide is written for Trouble Brewing. Most of it still applies.":"الدليل العام ده مكتوب لـ«الشر على نار هادية». معظمه ينفع برضه.",
     "Storyteller guide for a first game":"دليل الراوي لأول لعبة", "60-second pitch to read aloud":"كلمة في دقيقة تقراها بصوت عالي",
     "\"A Demon is hiding in our town, and it kills one of us every night. Most of you are good townsfolk, and each of you has a special ability that gives you clues. A few of you are evil Minions, and you know who the Demon is. Each day, we talk, nominate, and vote to execute someone. Good wins if we execute the Demon. Evil wins if only two of us are left alive. Dead players keep talking and get one last vote, so nobody is out of the game. Lying is allowed, and evil players will pretend to be good.\"":
       "«فيه شيطان مستخبّي في بلدنا، وكل ليلة بيقتل واحد مننا. معظمكم من أهل البلد الطيبين، وكل واحد عنده قدرة خاصة بتدّيله أدلّة. شوية منكم أتباع أشرار، وعارفين مين الشيطان. كل يوم بنتكلم، ونرشّح، ونصوّت عشان نعدم حد. الطيبين بيكسبوا لو عدمنا الشيطان. الأشرار بيكسبوا لو فضل اتنين بس عايشين. الأموات بيفضلوا يتكلموا وليهم صوت أخير، فمحدش بيخرج من اللعبة. الكدب مسموح، والأشرار هيعملوا نفسهم طيبين.»",
@@ -854,7 +854,7 @@ window.BOTC_AR = (() => {
   // Script names: translated for meaning (and fun), not just sounded out. The English
   // original is still shown underneath so it can be found on botcscripts.com.
   const scriptNames = {
-    tb:"المشاكل بتغلي", bmr:"القمر المشؤوم طالع", snv:"طوايف وبنفسج",
+    tb:"الشر على نار هادية", bmr:"ليلة نحس", snv:"طوايف وبنفسج",
     "c-3":"صيد القراميط", "c-42":"الوصلة", "c-76":"سيبه على راحته", "c-4669":"ولا حد يتحرّك!",
     "c-491":"متاهة أبو قرون", "c-77":"فرحة ما بعدها فرحة", "c-65":"علقة الشك", "c-104":"واحة نُص الليل",
     "c-441":"تهديد من تحت لتحت", "c-1945":"أي حد يقدر يلعب", "c-754":"ثق فيّا", "c-372":"تار هارولد هولت",
