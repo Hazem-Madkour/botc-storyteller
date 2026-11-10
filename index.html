@@ -1477,7 +1477,8 @@ function savePick(pr, result){
   state.picks[k] = entry;
   state.choices[k] = [...result.players]; // feeds the Fortune Teller / Ravenkeeper suggested answers
   delete state.advice[k];
-  logEvent("pick", {p:pr.pid, eff:pr.effId, players:result.players, chars:result.chars, yesno:result.yesno, none:result.none});
+  dropLastLog(e => e.k === "pick" && (e.key ? e.key === k : e.p === pr.pid && e.eff === pr.effId));
+  logEvent("pick", {key:k, p:pr.pid, eff:pr.effId, players:result.players, chars:result.chars, yesno:result.yesno, none:result.none});
 }
 
 // Under each step: the "Ask them" button, and what they chose.
@@ -2009,6 +2010,7 @@ function deleteNomination(d, i){
   (nm.spent || []).forEach(id => { const q = playerById(id); if (q) q.ghostVote = true; });
   // A nomination that is taken back never happened, so the Virgin keeps her ability.
   if (nm.virginUsed) { const v = playerById(nm.on); if (v) toggleRem(v, "Ability used", false); }
+  if (nm.done) dropLastLog(e => e.k === "nom" && e.by === nm.by && e.on === nm.on);
   d.noms.splice(i, 1);
 }
 
@@ -2100,17 +2102,33 @@ function nominationsHtml(){
 // are logged where they happen. state.log = [{ph, k, ...}]
 // ---------------------------------------------------------------------------
 function logEvent(k, data = {}){ (state.log ||= []).push({ph:state.phase, k, ...data}); }
+// Something done and then undone in the same night or day leaves no trace:
+// the undo removes the latest matching entry of the current phase instead of adding one.
+function dropLastLog(match){
+  const log = state.log || [], i = log.findLastIndex(e => e.ph === state.phase && match(e));
+  if (i < 0) return null;
+  return log.splice(i, 1)[0];
+}
 function snapshot(){ return {ph:state.phase, p:Object.fromEntries(state.players.map(p => [p.id, {a:p.alive, c:p.char, x:hasRem(p, "Executed today")}]))}; }
 function trackChanges(){
   const now = snapshot(), was = state.snap;
   state.snap = now;
   if (!was || now.ph === 0) return; // nothing to log during setup
-  if (now.ph !== was.ph) logEvent("phase");
+  if (now.ph !== was.ph) {
+    // Stepping back out of a phase where nothing happened forgets that phase.
+    if (now.ph < was.ph && !(state.log || []).some(e => e.ph === was.ph && e.k !== "phase")) state.log = (state.log || []).filter(e => e.ph !== was.ph);
+    if (!(state.log || []).some(e => e.ph === now.ph && e.k === "phase")) logEvent("phase");
+  }
   for (const [id, n] of Object.entries(now.p)) {
     const o = was.p[id]; if (!o) continue;
-    if (o.a && !n.a) logEvent(n.x ? "executed" : "died", {p:id});
-    if (!o.a && n.a) logEvent("revived", {p:id});
-    if (o.c && n.c && o.c !== n.c) logEvent("char", {p:id, from:o.c, to:n.c});
+    if (o.a && !n.a && !dropLastLog(e => e.k === "revived" && e.p === id)) logEvent(n.x ? "executed" : "died", {p:id});
+    if (!o.a && n.a && !dropLastLog(e => (e.k === "died" || e.k === "executed") && e.p === id)) logEvent("revived", {p:id});
+    if (o.c && n.c && o.c !== n.c) {
+      // A→B then B→C in one phase is logged as A→C; A→B→A disappears.
+      const prev = dropLastLog(e => e.k === "char" && e.p === id && e.to === o.c);
+      const from = prev ? prev.from : o.c;
+      if (from !== n.c) logEvent("char", {p:id, from, to:n.c});
+    }
   }
 }
 const pName = id => esc(playerById(id)?.name ?? "?");
@@ -2154,7 +2172,7 @@ const DAY_ABILITIES = {
   artist:{once:true, kind:"used", en:"Artist asked their question", ar:"الفنّان سأل سؤاله"},
   fisherman:{once:true, kind:"used", en:"Fisherman got advice", ar:"الصيّاد خد نصيحة"},
   savant:{kind:"used", perDay:true, en:"Savant visited you", ar:"العبقري زارك"},
-  klutz:{once:true, dead:true, kind:"pick", n:1, en:"Klutz chooses (they died)", ar:"الأخرق بيختار (مات)", ask:"Who does the Klutz choose?"},
+  klutz:{once:true, dead:true, kind:"pick", n:1, en:"Klutz chooses (they died)", ar:"اللَّخمة بيختار (مات)", ask:"Who does the Klutz choose?"},
   moonchild:{once:true, dead:true, kind:"pick", n:1, en:"Moonchild chooses (they died)", ar:"بنت القمر بتختار (ماتت)", ask:"Who does the Moonchild choose?"},
 };
 function dayAbilityList(){
@@ -2217,7 +2235,7 @@ function resolveDayAbility(d, open, v){
   switch (id) {
     case "slayer": {
       if (works && isDemon(t)) { t.alive = false; log(`shot ${t.name}, who was the Demon and died`, `ضرب ${t.name}، وكان الشيطان ومات`);
-        return {cls:"ok", html:`🎯 ${esc(t.name)} ${ar ? "كان الشيطان ومات!" : "was the Demon and dies!"}${inPlay("scarletwoman") ? `<br>${ar ? "خلّي بالك: الست القرمزية ممكن تبقى الشيطان." : "Careful: the Scarlet Woman may become the Demon."}` : ""}`}; }
+        return {cls:"ok", html:`🎯 ${esc(t.name)} ${ar ? "كان الشيطان ومات!" : "was the Demon and dies!"}${inPlay("scarletwoman") ? `<br>${ar ? "خلّي بالك: الست الحرباية ممكن تبقى الشيطان." : "Careful: the Scarlet Woman may become the Demon."}` : ""}`}; }
       log(`shot ${t.name}: nothing happened`, `ضرب ${t.name}: محصلش حاجة`);
       const rec = works && t.char === "recluse";
       return {cls:"warn", html:`🎯 ${ar ? "محصلش حاجة." : "Nothing happens."}${!works ? ` ${ar ? "(قدرته مش شغّالة: سكران أو مسموم)" : "(their ability doesn't work: drunk or poisoned)"}` : ""}${rec ? `<br>${ar ? "المنعزل ممكن يظهر كأنه الشيطان، لو حبّيت." : "The Recluse may register as the Demon if you want."}` : ""}`,
@@ -2350,6 +2368,7 @@ function logHtml(log, P = pName){
 function viewLog(){
   return `<section class="panel"><h2>📜 Game log</h2>
     ${state.phase ? `<h3>🏁 End of game</h3>${endGameButtons()}` : `<p class="muted">The log starts when you press Start Night 1.</p>`}
+    ${(state.log || []).length ? logExportButtons("current") : ""}
     ${logHtml(state.log)}</section>
     ${pastGamesHtml()}`;
 }
@@ -2372,12 +2391,48 @@ function archiveCurrent(){
   if (!gameStarted() || !state.players.some(p => p.char)) return;
   state.gameId ||= uid(); state.gameStart ||= Date.now();
   const h = loadHistory().filter(g => g.id !== state.gameId);
-  h.push({id:state.gameId, start:state.gameStart, saved:Date.now(), script:SCRIPT.id, scriptName:SCRIPT._en?.name || SCRIPT.name,
-    winner:state.ended?.winner || null, ph:state.ended?.ph ?? state.phase,
-    players:state.players.map(p => ({id:p.id, name:p.name, char:p.char, drunkAs:p.drunkAs, alive:p.alive})),
-    log:JSON.parse(JSON.stringify(state.log || []))});
+  h.push(gameRecord());
   h.sort((a, b) => b.start - a.start);
   saveHistory(h);
+}
+function gameRecord(){
+  return {id:state.gameId, start:state.gameStart || Date.now(), saved:Date.now(), script:SCRIPT.id, scriptName:SCRIPT._en?.name || SCRIPT.name,
+    winner:state.ended?.winner || null, ph:state.ended?.ph ?? state.phase,
+    players:state.players.map(p => ({id:p.id, name:p.name, char:p.char, drunkAs:p.drunkAs, alive:p.alive})),
+    log:JSON.parse(JSON.stringify(state.log || []))};
+}
+
+// Plain-text version of a game (players, then the log in time order) for copying or downloading.
+function gameText(g){
+  const ar = isAr(), sep = ar ? "، " : ", ";
+  const P = id => esc(g.players.find(x => x.id === id)?.name ?? "?");
+  const toText = html => new DOMParser().parseFromString(html, "text/html").body.textContent;
+  const out = [`${historyScriptName(g)} · ${fmtDate(g.start)}`,
+    g.winner === "good" ? (ar ? "😇 الطيبين كسبوا" : "😇 Good won") : g.winner === "evil" ? (ar ? "😈 الأشرار كسبوا" : "😈 Evil won") : (ar ? "لعبة مخلصتش" : "Unfinished game"),
+    "", ar ? "اللاعيبة:" : "Players:"];
+  g.players.forEach(p => {
+    const c = BY_ID[p.char], fake = c?.thinks && BY_ID[p.drunkAs], evil = ["minion","demon"].includes(c?.team);
+    out.push(`- ${p.name}: ${c ? c.name : "?"}${fake ? ` (${ar ? "كان فاكر نفسه" : "thought they were"} ${fake.name})` : ""}`
+      + `${sep}${evil ? (ar ? "شرير" : "evil") : (ar ? "طيب" : "good")}${sep}${p.alive ? (ar ? "عايش" : "alive") : (ar ? "ميّت" : "dead")}`);
+  });
+  const byPh = {};
+  (g.log || []).forEach(e => (byPh[e.ph] ||= []).push(e));
+  Object.keys(byPh).map(Number).sort((a, b) => a - b).forEach(ph => {
+    const lines = byPh[ph].filter(e => e.k !== "phase").map(e => `- ${toText(logLine(e, P))}`);
+    out.push("", `${phaseName(ph)}:`, ...(lines.length ? lines : [`- ${ar ? "محصلش حاجة." : "Nothing happened."}`]));
+  });
+  return out.join("\n") + "\n";
+}
+function logExportButtons(id){
+  return `<div class="row"><button data-action="log-copy" data-id="${id}">📋 Copy log</button>
+    <button data-action="log-download" data-id="${id}">⬇ Download log</button></div>`;
+}
+const exportGame = id => id === "current" ? gameRecord() : loadHistory().find(g => g.id === id);
+function downloadText(name, text){
+  const url = URL.createObjectURL(new Blob([text], {type:"text/plain;charset=utf-8"}));
+  const a = document.createElement("a"); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 const fmtDate = t => new Date(t).toLocaleString(isAr() ? "ar-EG-u-nu-latn" : undefined, {dateStyle:"medium", timeStyle:"short"});
 const historyScriptName = g => SCRIPTS[g.script]?.name || g.scriptName || "?";
@@ -2411,6 +2466,7 @@ function pastHtml(g){
       <table class="reveal-table"><tbody>${rows}</tbody></table>
       <h2>📜 ${ar ? "سجل اللعبة" : "Game log"}</h2>
       ${logHtml(g.log, P)}
+      ${logExportButtons(g.id)}
       <div class="row"><button class="primary big" data-action="past-close">✅ ${ar ? "خلاص" : "Close"}</button>
         <button class="danger" data-action="past-delete" data-id="${g.id}">🗑 ${ar ? "امسحها" : "Delete"}</button></div>
     </div></div>`;
@@ -2762,6 +2818,22 @@ document.addEventListener("click", e => {
     case "show-done": showing = null; break;
     case "spy-grimoire": state.hidden = false; tab = "grimoire"; break;
     case "print": window.print(); return;
+    case "log-copy": case "log-download": {
+      const g = exportGame(b.dataset.id); if (!g) return;
+      const text = gameText(g);
+      if (b.dataset.action === "log-download") {
+        const day = new Date(g.start).toISOString().slice(0, 10);
+        downloadText(`botc-${(g.scriptName || g.script || "game").replace(/[^\w-]+/g, "-").toLowerCase()}-${day}.txt`, text);
+        return;
+      }
+      const done = () => { b.textContent = isAr() ? "اتنسخ ✓" : "Copied ✓"; };
+      (navigator.clipboard?.writeText(text) ?? Promise.reject()).then(done, () => {
+        const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", "");
+        ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta);
+        ta.select(); document.execCommand("copy"); ta.remove(); done();
+      });
+      return;
+    }
     case "copy-json": {
       const ta = $("#json");
       (navigator.clipboard?.writeText(ta.value) ?? Promise.reject()).then(() => { b.textContent = "Copied ✓"; }, () => { ta.select(); document.execCommand("copy"); b.textContent = "Copied ✓"; });

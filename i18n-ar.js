@@ -437,7 +437,7 @@ window.BOTC_AR = (() => {
     "First night:":"الليلة الأولى:", "Other nights:":"الليالي التانية:", "Minion info (7+)":"معلومات الأتباع (7+)", "Demon info + bluffs (7+)":"معلومات الشيطان + الخُدع (7+)",
     "JSON for the official script tool / botc.app":"JSON لأداة السكريبتات الرسمية / botc.app",
     "Paste this into the official script tool or botc.app to load the same script.":"الزق ده في أداة السكريبتات الرسمية أو botc.app عشان تفتح نفس السكريبت.",
-    "Copy JSON":"انسخ JSON", "Copied ✓":"اتنسخ ✓", "Jinxes (special rules when both are in play)":"قواعد خاصة لما الشخصيتين يبقوا في اللعبة مع بعض",
+    "Copy JSON":"انسخ JSON", "Copied ✓":"اتنسخ ✓", "Copy log":"انسخ السجل", "Download log":"نزّل السجل", "Jinxes (special rules when both are in play)":"قواعد خاصة لما الشخصيتين يبقوا في اللعبة مع بعض",
     // Guide
     "Storyteller tips for this script":"نصايح للراوي في السكريبت ده",
     "This general guide is written for Trouble Brewing. Most of it still applies.":"الدليل العام ده مكتوب لـ«الشر على نار هادية». معظمه ينفع برضه.",
