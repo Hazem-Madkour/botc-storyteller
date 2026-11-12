@@ -379,6 +379,9 @@ window.BOTC_ES = (() => {
     "Private reveal":"Míralo tú solo", "Your character":"Tu personaje",
     "Choose the characters myself":"Elegir yo los personajes", "Choose the characters":"Elige los personajes",
     "Fill randomly":"Rellenar al azar", "chosen":"elegidos", "thinks they are":"se cree", "Deal this deck":"Repartir este mazo",
+    "Use recommended numbers":"Usar los números recomendados", "Recommended:":"Recomendado:", "Your numbers add up to":"Tus números suman",
+    "Set how many of each team you want. Fill randomly uses these numbers.":"Elige cuántos quieres de cada equipo. «Rellenar al azar» usa estos números.",
+    "✓ Matches the numbers you chose.":"✓ Coincide con los números que elegiste.",
     "These team counts don't match the setup rules. Deal this deck anyway?":"Los números por equipo no cumplen las reglas de preparación. ¿Repartir este mazo de todos modos?",
     "Start dealing this deck? Current characters will be cleared.":"¿Empezar a repartir este mazo? Se borrarán los personajes actuales.",
     // Grimoire

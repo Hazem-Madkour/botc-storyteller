@@ -376,6 +376,9 @@ window.BOTC_AR = (() => {
     "Private reveal":"شوفها لوحدك", "Your character":"شخصيتك",
     "Choose the characters myself":"هختار الشخصيات بنفسي", "Choose the characters":"اختار الشخصيات",
     "Fill randomly":"املاها عشوائي", "chosen":"متختارين", "thinks they are":"فاكر نفسه", "Deal this deck":"وزّع الشخصيات دي",
+    "Use recommended numbers":"استخدم الأعداد المقترحة", "Recommended:":"المقترح:", "Your numbers add up to":"مجموع أعدادك",
+    "Set how many of each team you want. Fill randomly uses these numbers.":"اختار عايز كام من كل فريق. «املاها عشوائي» بيستخدم الأعداد دي.",
+    "✓ Matches the numbers you chose.":"✓ ماشية مع الأعداد اللي إنت اخترتها.",
     "These team counts don't match the setup rules. Deal this deck anyway?":"أعداد الفرق دي مش ماشية مع قواعد التجهيز. توزّعها برضه؟",
     "Start dealing this deck? Current characters will be cleared.":"تبدأ توزّع الشخصيات دي؟ الشخصيات الحالية هتتمسح.",
     // Grimoire

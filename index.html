@@ -151,6 +151,7 @@
   /* Deal */
   .deal-who { font-size:22px; margin:8px 0; }
   .deck-row { justify-content:flex-start; gap:6px; margin-bottom:6px; }
+  .count-in { width:4em; padding:2px 6px; font:inherit; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:10px; margin:10px 0; }
   .card { aspect-ratio:3/4; font-size:28px; font-weight:800; background:var(--good-bg); color:var(--good); border:2px solid var(--good); border-radius:12px; }
   .overlay { position:fixed; inset:0; z-index:50; background:var(--panel); color:var(--text); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; }
@@ -1047,9 +1048,19 @@ function draftFixFakes(draft){
     if (!draftFakeOptions(c, draft).some(x => x.id === draft.drunkAs[c.id])) draft.drunkAs[c.id] = draftDefaultFake(c, draft);
   });
 }
+// Recommended team counts for n players, as {townsfolk, outsider, minion, demon}.
+const recCounts = n => { const [t, o, m, dm] = DIST[n]; return {townsfolk:t, outsider:o, minion:m, demon:dm}; };
 function draftRandom(){
-  const r = rollSetup(state.players.length);
-  state.draft = {chars:r.chars, drunkAs:{...r.drunkAs}};
+  const n = state.players.length, rec = recCounts(n), counts = state.draft?.counts || rec;
+  if (TEAMS.every(t => counts[t] === rec[t])) {
+    const r = rollSetup(n);
+    state.draft = {chars:r.chars, drunkAs:{...r.drunkAs}, counts};
+    return;
+  }
+  // The Storyteller's own numbers: plain characters only, so the counts stay exactly as chosen.
+  const chars = TEAMS.flatMap(t => shuffle(ofTeam(t).filter(c => !c.special && !c.setup && !REQUIRES[c.id])).slice(0, counts[t]).map(c => c.id));
+  state.draft = {chars, drunkAs:{}, counts};
+  draftFixFakes(state.draft);
 }
 function draftToggle(id){
   const d = state.draft, i = d.chars.indexOf(id);
@@ -1062,7 +1073,8 @@ function draftDeal(){
   if (d.chars.length !== n) return;
   const chars = d.chars.map(id => BY_ID[id]), act = Object.fromEntries(TEAMS.map(t => [t, chars.filter(c => c.team === t).length]));
   const legal = expectedOptions(chars, n).some(e => TEAMS.every(t => e[t] === act[t]));
-  if (!legal && !confirm("These team counts don't match the setup rules. Deal this deck anyway?")) return;
+  const asChosen = d.counts && TEAMS.every(t => d.counts[t] === act[t]);
+  if (!legal && !asChosen && !confirm("These team counts don't match the setup rules. Deal this deck anyway?")) return;
   if (state.players.some(p => p.char) && !confirm("Start dealing this deck? Current characters will be cleared.")) return;
   const used = new Set([...d.chars, ...Object.values(d.drunkAs)]);
   // Keep the Storyteller's bluffs if they still fit, otherwise pick 3 unused Townsfolk.
@@ -1079,22 +1091,27 @@ function draftHtml(){
   const legal = full && opts.some(e => TEAMS.every(t => e[t] === act[t]));
   const thinkers = chars.filter(c => c.thinks);
   const ready = full && thinkers.every(c => d.drunkAs[c.id]);
-  const teamBlock = t => `<h3>${esc(TEAM_LABEL[t])} <span class="no-tr">${act[t]} / ${[...new Set(opts.map(e => e[t]))].join(lx({en:" or ", ar:" أو ", es:" o ", it:" o "}))}</span></h3>
+  const counts = d.counts ||= recCounts(n), total = TEAMS.reduce((s, t) => s + counts[t], 0);
+  const teamBlock = t => `<h3>${esc(TEAM_LABEL[t])} <span class="no-tr">${act[t]} /</span>
+      <input type="number" class="count-in" min="0" max="${n}" value="${counts[t]}" data-change="draft-count" data-team="${t}" aria-label="${esc(TEAM_LABEL[t])}">
+      <small class="muted"><span>Recommended:</span> <span class="no-tr">${[...new Set(opts.map(e => e[t]))].join(lx({en:" or ", ar:" أو ", es:" o ", it:" o "}))}</span></small></h3>
     <div class="chip-row deck-row">${ofTeam(t).map(c => {
       const on = d.chars.includes(c.id);
       return `<button class="mini" data-action="draft-toggle" data-id="${c.id}" aria-pressed="${on}" ${!on && full ? "disabled" : ""}>${c.icon} ${esc(c.name)}</button>`;
     }).join("")}</div>`;
   return `<section class="panel"><h2>🃏 Choose the characters</h2>
     <p class="muted">Pick exactly ${n} characters. Only you see this screen. When you deal, the players draw them at random by number.</p>
-    <div class="row"><button data-action="draft-random">🎲 Fill randomly</button><button data-action="draft-clear">Clear</button>
-      <button data-action="draft-close">Cancel</button></div>
-    <p><b class="no-tr">${d.chars.length} / ${n}</b> <span>chosen</span></p>
+    <div class="row"><button data-action="draft-random">🎲 Fill randomly</button><button data-action="draft-rec">Use recommended numbers</button>
+      <button data-action="draft-clear">Clear</button><button data-action="draft-close">Cancel</button></div>
+    <p class="muted">Set how many of each team you want. Fill randomly uses these numbers.</p>
+    <p><b class="no-tr">${d.chars.length} / ${n}</b> <span>chosen</span>${total !== n ? ` · <span class="flag"><span>Your numbers add up to</span> <span class="no-tr">${total} / ${n}</span></span>` : ""}</p>
     ${TEAMS.map(teamBlock).join("")}
     ${thinkers.map(c => `<div class="row"><label for="fake-${c.id}" class="inline"><span>${c.icon} ${esc(c.name)}</span> <span>thinks they are</span></label>
       <select id="fake-${c.id}" data-change="draft-fake" data-id="${c.id}">${draftFakeOptions(c, d).map(x =>
         `<option value="${x.id}" ${d.drunkAs[c.id] === x.id ? "selected" : ""}>${x.icon} ${esc(x.name)}</option>`).join("")}</select></div>`).join("")}
     ${chars.some(c => c.neighborDemon) ? `<p class="muted">⚠ The Marionette must sit next to the Demon. Drag their seat in the Grimoire.</p>` : ""}
     ${full ? (legal ? `<div class="msg ok">✓ Character counts match the setup rules.</div>`
+      : TEAMS.every(t => counts[t] === act[t]) ? `<div class="msg ok">✓ Matches the numbers you chose.</div>`
       : `<div class="msg warn">⚠ Expected ${opts.map(e => TEAMS.map(t => `${e[t]} ${t}`).join(", ")).join(" or ")}. Current: ${TEAMS.map(t => `${act[t]} ${t}`).join(", ")}.</div>`) : ""}
     <div class="row"><button class="primary big" data-action="draft-deal" ${ready ? "" : "disabled"}>🃏 Deal this deck</button></div>
   </section>`;
@@ -2913,7 +2930,8 @@ document.addEventListener("click", e => {
     case "deal-new": state.draft = null; startDeal(); break;
     case "draft-open": if (!DIST[state.players.length]) { alert("Create 5 to 15 seats in Setup first."); return; } draftRandom(); break;
     case "draft-random": draftRandom(); break;
-    case "draft-clear": state.draft = {chars:[], drunkAs:{}}; break;
+    case "draft-rec": state.draft.counts = recCounts(state.players.length); break;
+    case "draft-clear": state.draft = {chars:[], drunkAs:{}, counts:state.draft.counts}; break;
     case "draft-close": state.draft = null; break;
     case "draft-toggle": draftToggle(b.dataset.id); break;
     case "draft-deal": draftDeal(); break;
@@ -3028,6 +3046,7 @@ document.addEventListener("change", e => {
     case "p-rem": toggleRem(p, el.dataset.rem, el.checked); break;
     case "step": state.done[el.dataset.key] = el.checked; break;
     case "lang": state.lang = el.value; state.advice = {}; applyLang(); break;
+    case "draft-count": if (state.draft) state.draft.counts[el.dataset.team] = Math.max(0, Math.min(state.players.length, parseInt(el.value, 10) || 0)); break;
     case "deal-seat": state.deal.seat = el.value; break;
     case "draft-fake": if (state.draft) { state.draft.drunkAs[el.dataset.id] = el.value; draftFixFakes(state.draft); } break;
     case "choice": {
