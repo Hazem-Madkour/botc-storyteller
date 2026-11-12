@@ -482,7 +482,7 @@ window.BOTC_AR = (() => {
     "Who does the Klutz choose?":"اللَّخمة هيختار مين؟", "Who does the Moonchild choose?":"بنت القمر هتختار مين؟",
     "Discussion timer":"تايمر النقاش", "Time's up":"الوقت خلص", "Pause":"وقّف", "Start":"ابدأ", "+1 min":"+1 دقيقة", "Reset":"صفّر",
     "Discussion timer:":"تايمر النقاش:",
-    "Game log":"سجل اللعبة", "End of game":"آخر اللعبة", "End the game:":"خلّص اللعبة:", "Good wins":"الطيبين كسبوا", "Evil wins":"الأشرار كسبوا",
+    "Game log":"سجل اللعبة", "End of game":"آخر اللعبة", "End the game":"خلّص اللعبة", "More":"كمان", "End the game:":"خلّص اللعبة:", "Good wins":"الطيبين كسبوا", "Evil wins":"الأشرار كسبوا",
     "Show the reveal again":"ورّي مين كان مين تاني", "Not over yet":"لسه مخلصتش",
     "The log starts when you press Start Night 1.":"السجل بيبدأ لما تدوس «ابدأ الليلة الأولى».", "Nothing logged yet.":"لسه مفيش حاجة متسجّلة.",
     "Game over":"اللعبة خلصت", "Dies tonight (Moonchild)":"هيموت الليلة (بنت القمر)", "Guess Used":"التخمين اتستخدم",

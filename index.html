@@ -39,6 +39,13 @@
   nav { display:flex; gap:4px; padding:8px 16px 0; flex-wrap:wrap; }
   nav button { border-bottom-left-radius:0; border-bottom-right-radius:0; }
   nav button[aria-selected="true"] { background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  .tab-more { position:relative; }
+  .tab-more > summary { list-style:none; cursor:pointer; border:1px solid var(--border); border-radius:8px 8px 0 0; padding:6px 10px; background:var(--panel); }
+  .tab-more > summary::-webkit-details-marker { display:none; }
+  .tab-more > summary[aria-selected="true"] { background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  .tab-menu { position:absolute; z-index:20; inset-inline-start:0; top:100%; display:flex; flex-direction:column; gap:4px; padding:6px;
+    background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:8px; min-width:180px; box-shadow:0 6px 18px rgba(0,0,0,.25); }
+  .tab-menu button { border-radius:8px; text-align:start; }
   main { padding:16px; max-width:1200px; margin:0 auto; }
   button, select, input, textarea { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
   button { cursor:pointer; }
@@ -1720,6 +1727,17 @@ function nightSteps(){
 // Views
 // ---------------------------------------------------------------------------
 const TABS = [["setup","Setup"],["deal","Deal"],["grimoire","Grimoire"],["night","Night & Day"],["log","Game log"],["script","Script sheet"],["tips","Beginner guide"]];
+// During a game only the Grimoire and Night & Day stay in the bar (plus the log once it's over);
+// the rest move into a "More" menu.
+function tabsHtml(){
+  const main = state.phase > 0 ? ["grimoire", "night", ...(state.ended ? ["log"] : [])] : TABS.map(([k]) => k);
+  const btn = ([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-action="tab" data-tab="${k}">${l}</button>`;
+  const rest = TABS.filter(([k]) => !main.includes(k));
+  const cur = rest.find(([k]) => k === tab);
+  return TABS.filter(([k]) => main.includes(k)).map(btn).join("")
+    + (rest.length ? `<details class="tab-more"><summary role="tab" aria-selected="${!!cur}"><span>${cur ? cur[1] : "More"}</span> ▾</summary>
+        <div class="tab-menu">${rest.map(btn).join("")}</div></details>` : "");
+}
 
 function charOptions(sel, teams = TEAMS){
   return `<option value="">— none —</option>` + teams.map(t => `<optgroup label="${TEAM_LABEL[t]}">${
@@ -2021,7 +2039,8 @@ function viewNight(){
         ${stepCardButtons(s)}
         ${adviceBlock(s)}
       </li>`; }).join("")}</ol>
-    <div class="row"><button class="primary" data-action="next-phase">Dawn → start Day ${nightNum()}</button></div></section>`;
+    <div class="row"><button class="primary" data-action="next-phase">Dawn → start Day ${nightNum()}</button></div>
+    ${endGameSection()}</section>`;
 }
 
 // ---------------------------------------------------------------------------
@@ -2428,6 +2447,12 @@ function endGameButtons(){
     <button class="${s === "good" ? "primary" : ""}" data-action="end-game" data-v="good">😇 Good wins</button>
     <button class="${s === "evil" ? "primary" : ""}" data-action="end-game" data-v="evil">😈 Evil wins</button></div>`;
 }
+// Night & Day: a suggested result goes at the top; otherwise the controls wait at the bottom.
+function endGameSection(){
+  if (state.ended) return `<h3>🏁 End of game</h3>${endGameButtons()}`;
+  if (suggestedWinner()) return "";
+  return `<details class="more"><summary>🏁 End the game</summary>${endGameButtons()}</details>`;
+}
 // Log grouped by phase, newest phase first.
 function logHtml(log, P = pName){
   const byPh = {};
@@ -2438,7 +2463,7 @@ function logHtml(log, P = pName){
 }
 function viewLog(){
   return `<section class="panel"><h2>📜 Game log</h2>
-    ${state.phase ? `<h3>🏁 End of game</h3>${endGameButtons()}` : `<p class="muted">The log starts when you press Start Night 1.</p>`}
+    ${state.phase ? "" : `<p class="muted">The log starts when you press Start Night 1.</p>`}
     ${(state.log || []).length ? logExportButtons("current") : ""}
     ${logHtml(state.log)}</section>
     ${pastGamesHtml()}`;
@@ -2573,7 +2598,8 @@ function viewDay(msgs){
     ${special.length ? `<h3>Watch out today</h3><ul>${special.map(s => `<li>${s}</li>`).join("")}</ul>` : ""}
     ${timerHtml()}
     ${dayAbilitiesHtml()}
-    ${nominationsHtml()}</section>`;
+    ${nominationsHtml()}
+    ${endGameSection()}</section>`;
 }
 
 function viewScript(){
@@ -2652,7 +2678,7 @@ function render(){
   hb.innerHTML = `<span class="full">${hideIcon} ${hideLabel}</span><span class="short" aria-hidden="true">${hideIcon}</span>`;
   hb.setAttribute("aria-label", hideLabel);
   $("#hideBtn").setAttribute("aria-pressed", String(state.hidden));
-  $("#tabs").innerHTML = TABS.map(([k, l]) => `<button role="tab" aria-selected="${k === tab}" data-action="tab" data-tab="${k}">${l}</button>`).join("");
+  $("#tabs").innerHTML = tabsHtml();
   trackChanges(); // log deaths, executions, character and phase changes
   $("#view").innerHTML = VIEWS[tab]();
   const ovScroll = document.querySelector("#overlay .overlay")?.scrollTop || 0; // keep the builder's scroll position
