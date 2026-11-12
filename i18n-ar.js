@@ -121,7 +121,8 @@ window.BOTC_AR = (() => {
     courtier: {firstText:"ممكن يهزّ راسه بلأ أو يشاور على شخصية في الورقة. لو موجودة في اللعبة، حطّ على اللاعب ده علامة «سكران (الوصيف)» 3 ليالي و3 أيام. حطّ علامة «القدرة اتستخدمت».",
       otherText:"ممكن يهزّ راسه بلأ أو يشاور على شخصية في الورقة. لو موجودة في اللعبة، حطّ على اللاعب ده علامة «سكران (الوصيف)» 3 ليالي و3 أيام. حطّ علامة «القدرة اتستخدمت»."},
     professor: {otherText:"ممكن يهزّ راسه بلأ أو يشاور على لاعب ميّت. لو اللاعب ده من أهل البلد، رجّعه للحياة. حطّ علامة «القدرة اتستخدمت»."},
-    lunatic: {firstText:"صحّي المجنون كأنه الشيطان: شاور على أي لاعيبة على إنهم «أتباعه» وورّيه 3 خُدع."},
+    lunatic: {firstText:"صحّي المجنون كأنه الشيطان: شاور على أي لاعيبة على إنهم «أتباعه» وورّيه 3 خُدع.",
+      otherText:"اعمل اللي محتاج يتعمل عشان يبان إن الشيطان بيتحرّك. نيّم المجنون. صحّي الشيطان. ورّيه بطاقة المجنون وشاور عليه، وبعدين على اللي اختارهم."},
     tinker: {otherText:"متصحّيهوش. ممكن تقتل المصلّحاتي دلوقتي لو ده في مصلحة اللعبة."},
     moonchild: {otherText:"بس لو بنت القمر ماتت واختارت لاعب: لو اللاعب ده طيب، بيموت الليلة."},
     godfather: {firstText:"ورّيه بطاقات الغلابة اللي في اللعبة.", otherText:"بس لو غلبان مات النهارده: بيشاور على لاعب، وبيموت."},
@@ -854,6 +855,19 @@ window.BOTC_AR = (() => {
   };
   ui[" The Recluse and Spy can change how players register here, but for beginners just give the true number."] = " المنعزل والجاسوس ممكن يخلّوا اللاعيبة يظهروا غير حقيقتهم هنا، بس للمبتدئين ادّي الرقم الصح وخلاص.";
   ui[". The Recluse and Spy can change how players register here, but for beginners just give the true number."] = ". المنعزل والجاسوس ممكن يخلّوا اللاعيبة يظهروا غير حقيقتهم هنا، بس للمبتدئين ادّي الرقم الصح وخلاص.";
+  // "To help evil" advice fragments.
+  Object.assign(ui, {
+    "the Spy can register as a Townsfolk, so you could show":"الجاسوس ممكن يظهر إنه من أهل البلد، فممكن تورّيه", "and point to":"وتشاور على", "and someone else.":"وحد تاني.",
+    ". This backs up the Demon's bluff, a big help for evil.":". ده بيأكّد كدبة الشيطان، وده بيساعد الأشرار جدًا.",
+    ", even though there is an Outsider in play.":"، رغم إن فيه غلبان في اللعبة.", ", even though there are Outsiders in play.":"، رغم إن فيه غلابة في اللعبة.",
+    "the Recluse can register as a Minion, so you could point to":"المنعزل ممكن يظهر كتابع، فممكن تشاور على", "and a good player.":"ولاعب طيب.",
+    ". Both are actually good, so this frames innocent players.":". الاتنين طيبين في الحقيقة، فكده إنت بتلبّس ناس بريئة.",
+    "the Recluse can register as a Minion or Demon, so you could show a Minion token.":"المنعزل ممكن يظهر كتابع أو شيطان، فممكن تورّيه بطاقة تابع.",
+  });
+  patterns.push(
+    [/^the Spy can register as good, so you could show (\d+)\.$/, "الجاسوس ممكن يظهر إنه طيب، فممكن تورّيه $1."],
+    [/^the Recluse can register as evil, so you could show (\d+)\.$/, "المنعزل ممكن يظهر إنه شرير، فممكن تورّيه $1."],
+  );
   // Script names: translated for meaning (and fun), not just sounded out. The English
   // original is still shown underneath so it can be found on botcscripts.com.
   const scriptNames = {

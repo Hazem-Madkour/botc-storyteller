@@ -109,7 +109,7 @@
   /* Cairo (SIL Open Font License, fonts/OFL.txt), bundled locally so Arabic looks right offline. */
   @font-face { font-family:"Cairo"; font-style:normal; font-weight:400 800; font-display:swap; src:url("fonts/cairo-arabic.woff2") format("woff2"); unicode-range:U+0600-06FF, U+0750-077F, U+0870-0891, U+0897-08E1, U+08E3-08FF, U+200C-200E, U+2010-2011, U+204F, U+2E41, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC, U+102E0-102FB, U+10E60-10E7E, U+10EC2-10EC7, U+10EC9-10EEE, U+10EF0-10EFF, U+1EE00-1EE03, U+1EE05-1EE1F, U+1EE21-1EE22, U+1EE24, U+1EE27, U+1EE29-1EE32, U+1EE34-1EE37, U+1EE39, U+1EE3B, U+1EE42, U+1EE47, U+1EE49, U+1EE4B, U+1EE4D-1EE4F, U+1EE51-1EE52, U+1EE54, U+1EE57, U+1EE59, U+1EE5B, U+1EE5D, U+1EE5F, U+1EE61-1EE62, U+1EE64, U+1EE67-1EE6A, U+1EE6C-1EE72, U+1EE74-1EE77, U+1EE79-1EE7C, U+1EE7E, U+1EE80-1EE89, U+1EE8B-1EE9B, U+1EEA1-1EEA3, U+1EEA5-1EEA9, U+1EEAB-1EEBB, U+1EEF0-1EEF1; }
   @font-face { font-family:"Cairo"; font-style:normal; font-weight:400 800; font-display:swap; src:url("fonts/cairo-latin.woff2") format("woff2"); unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-  [dir="rtl"] body, [dir="rtl"] button, [dir="rtl"] select, [dir="rtl"] input, [dir="rtl"] textarea, #langBtn[lang="ar"] {
+  [dir="rtl"] body, [dir="rtl"] button, [dir="rtl"] select, [dir="rtl"] input, [dir="rtl"] textarea, #langSel {
     font-family:"Cairo",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif; }
   [dir="rtl"] body { line-height:1.65; }
   .orig-name { font-size:12px; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -279,7 +279,7 @@
 <main id="view"></main>
 <div id="overlay"></div>
 <footer class="muted no-print" style="text-align:center;font-size:12px;padding:8px 16px 20px">
-  <p style="margin:0 0 8px"><button data-action="toggle-lang" id="langBtn" class="no-tr"></button></p>
+  <p style="margin:0 0 8px" class="no-tr"><label for="langSel">🌐</label> <select id="langSel" data-change="lang" aria-label="Language"></select></p>
   Unofficial fan tool. Blood on the Clocktower and its character data are © The Pandemonium Institute, used under their
   <a href="https://release.botc.app/resources/" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">Community Created Content policy</a>.
   Community scripts from <a href="https://www.botcscripts.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">botcscripts.com</a>.
@@ -287,8 +287,10 @@
 
 <!-- Official character data + community scripts. Rebuild with: python3 tools/update_data.py -->
 <script src="data.js"></script>
-<!-- Egyptian Arabic translation (🌐 button in the header) -->
+<!-- Translations: Egyptian Arabic, Spanish, Italian (language picker in the footer) -->
 <script src="i18n-ar.js"></script>
+<script src="i18n-es.js"></script>
+<script src="i18n-it.js"></script>
 <script>
 "use strict";
 // ---------------------------------------------------------------------------
@@ -741,18 +743,24 @@ state.customScripts.forEach(m => { SCRIPTS[m.id] = makeScript(m); });
 useScript(state.script);
 
 // ---------------------------------------------------------------------------
-// Egyptian Arabic. Character + script text is swapped at data level (so every
+// Translations. Character + script text is swapped at data level (so every
 // sentence that mentions a character switches too); everything else on screen is
-// translated after each render from the phrase table in i18n-ar.js.
+// translated after each render from the phrase table in i18n-<lang>.js.
 // ---------------------------------------------------------------------------
-const AR = window.BOTC_AR || null;
-const isAr = () => state.lang === "ar" && !!AR;
+const LANGS = Object.fromEntries([["ar", window.BOTC_AR], ["es", window.BOTC_ES], ["it", window.BOTC_IT]].filter(([, v]) => v));
+const LANG_NAMES = [["en", "English"], ["ar", "عربي مصري"], ["es", "Español"], ["it", "Italiano"]].filter(([k]) => k === "en" || LANGS[k]);
+const LOCALE = {en:undefined, ar:"ar-EG-u-nu-latn", es:"es-ES", it:"it-IT"};
+const L = () => LANGS[state.lang] || null;
+const isAr = () => state.lang === "ar" && !!LANGS.ar;
+// Inline text in each language: lx({en:"…", ar:"…", es:"…", it:"…"}).
+const lx = o => (L() && o[state.lang] != null) ? o[state.lang] : o.en;
 const normKey = s => String(s).replace(/\uFE0F/g, "").replace(/\s+/g, " ").trim();
-const UI_AR = AR ? Object.fromEntries(Object.entries(AR.ui).map(([k, v]) => [normKey(k), v])) : {};
+const UI_MAPS = {};
+const uiMap = () => (UI_MAPS[state.lang] ||= Object.fromEntries(Object.entries(L().ui).map(([k, v]) => [normKey(k), v])));
 function tr(text){
-  const t = normKey(text);
-  if (UI_AR[t] != null) return UI_AR[t];
-  for (const [re, rep] of AR.patterns) if (re.test(t)) return t.replace(re, rep);
+  const t = normKey(text), map = uiMap();
+  if (map[t] != null) return map[t];
+  for (const [re, rep] of L().patterns) if (re.test(t)) return t.replace(re, rep);
   // Leading emoji / symbols ("🙈 Hide grimoire", "· Player 3", "💡 ..."): translate the rest.
   const m = t.match(/^([^\p{L}\p{N}"«(\[*]+)(.+)$/u);
   if (m) { const r = tr(m[2]); if (r !== m[2]) return m[1] + r; }
@@ -761,39 +769,40 @@ function tr(text){
 // Full translation: phrase/pattern, then in-sentence phrases and default player names.
 function trFull(text){
   let r = tr(text);
-  for (const [a, b] of AR.subs || []) r = r.split(a).join(b);
-  return r.replace(/\bPlayer (\d+)\b/g, "لاعب $1");
+  for (const [a, b] of L().subs || []) r = r.split(a).join(b);
+  const player = lx({en:"Player", ar:"لاعب", es:"Jugador", it:"Giocatore"});
+  return r.replace(/\bPlayer (\d+)\b/g, `${player} $1`);
 }
 function applyLang(){
-  const ar = isAr();
+  const T = L();
   Object.values(BY_ID).forEach(c => {
     c._en ||= {name:c.name, ability:c.ability, firstText:c.firstText, otherText:c.otherText, thinksNote:c.thinksNote, dayNote:c.dayNote};
-    const t = ar && AR.chars[c.id];
+    const t = T && T.chars[c.id];
     Object.assign(c, c._en, t || {});
     // Experimental characters' Day note is their ability text; follow the translated ability.
     if (t && !t.dayNote && c._en.dayNote?.startsWith("– ")) c.dayNote = "– " + t.ability;
   });
   Object.values(SCRIPTS).forEach(s => {
     s._en ||= {name:s.name, blurb:s.blurb, twists:s.twists, experience:s.experience, levelLabel:s.levelLabel, time:s.time, tips:s.tips};
-    Object.assign(s, s._en, ar && AR.scripts[s.id] ? AR.scripts[s.id] : {});
+    Object.assign(s, s._en, T && T.scripts[s.id] ? T.scripts[s.id] : {});
   });
   TEAM_EN ||= {...TEAM_LABEL};
-  Object.assign(TEAM_LABEL, ar ? AR.teams : TEAM_EN);
-  document.documentElement.lang = ar ? "ar" : "en";
-  document.documentElement.dir = ar ? "rtl" : "ltr";
+  Object.assign(TEAM_LABEL, T ? T.teams : TEAM_EN);
+  document.documentElement.lang = T ? state.lang : "en";
+  document.documentElement.dir = isAr() ? "rtl" : "ltr";
 }
 let TEAM_EN = null;
 const ORIG = new WeakMap();
 function translateDom(root){
   if (!root) return;
-  const ar = isAr();
+  const on = !!L();
   const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) {
     const p = n.parentElement;
     if (!p || p.closest("textarea, script, style, .no-tr")) continue;
     if (!ORIG.has(n)) ORIG.set(n, n.nodeValue);
     const o = ORIG.get(n);
-    if (!ar || !/[A-Za-z]/.test(o)) { if (n.nodeValue !== o) n.nodeValue = o; continue; }
+    if (!on || !/[A-Za-z]/.test(o)) { if (n.nodeValue !== o) n.nodeValue = o; continue; }
     n.nodeValue = o.match(/^\s*/)[0] + trFull(o.trim()) + o.match(/\s*$/)[0];
   }
   [root, ...root.querySelectorAll("[placeholder],[aria-label],[title]")].forEach(el => {
@@ -803,14 +812,15 @@ function translateDom(root){
       const k = "data-en-" + a;
       if (!el.hasAttribute(k)) el.setAttribute(k, el.getAttribute(a));
       const o = el.getAttribute(k);
-      el.setAttribute(a, ar && /[A-Za-z]/.test(o) ? trFull(o) : o);
+      el.setAttribute(a, on && /[A-Za-z]/.test(o) ? trFull(o) : o);
     });
   });
 }
 // Pop-up questions and warnings follow the language too.
 const nativeAlert = window.alert.bind(window), nativeConfirm = window.confirm.bind(window);
-window.alert = m => nativeAlert(isAr() ? trFull(m) : m);
-window.confirm = m => nativeConfirm(isAr() ? trFull(m) : m);
+window.alert = m => nativeAlert(L() ? trFull(m) : m);
+window.confirm = m => nativeConfirm(L() ? trFull(m) : m);
+if (state.lang !== "en" && !L()) state.lang = "en"; // a saved language whose file didn't load
 applyLang();
 let tab = state.players.length ? "grimoire" : "setup";
 let selected = null, scrollToEditor = false;
@@ -1069,7 +1079,7 @@ function draftHtml(){
   const legal = full && opts.some(e => TEAMS.every(t => e[t] === act[t]));
   const thinkers = chars.filter(c => c.thinks);
   const ready = full && thinkers.every(c => d.drunkAs[c.id]);
-  const teamBlock = t => `<h3>${esc(TEAM_LABEL[t])} <span class="no-tr">${act[t]} / ${[...new Set(opts.map(e => e[t]))].join(isAr() ? " أو " : " or ")}</span></h3>
+  const teamBlock = t => `<h3>${esc(TEAM_LABEL[t])} <span class="no-tr">${act[t]} / ${[...new Set(opts.map(e => e[t]))].join(lx({en:" or ", ar:" أو ", es:" o ", it:" o "}))}</span></h3>
     <div class="chip-row deck-row">${ofTeam(t).map(c => {
       const on = d.chars.includes(c.id);
       return `<button class="mini" data-action="draft-toggle" data-id="${c.id}" aria-pressed="${on}" ${!on && full ? "disabled" : ""}>${c.icon} ${esc(c.name)}</button>`;
@@ -1418,7 +1428,7 @@ function composerHtml(c){
   const f = k => c.focus.includes(k) ? "suggested" : "";
   const pressed = v => `aria-pressed="${!!v}"`;
   // Titles are stored in English (so they translate on the card); show them in the current language.
-  const shown = l => isAr() && /[A-Za-z]/.test(l) ? trFull(l) : l;
+  const shown = l => L() && /[A-Za-z]/.test(l) ? trFull(l) : l;
   const isLabel = l => c.label === l || c.label === shown(l);
   const nums = Array.from({length:Math.max(10, state.players.length + 1)}, (_, i) => i);
   return `<div class="overlay composer" role="dialog" aria-modal="true" aria-label="Card builder">
@@ -1811,14 +1821,14 @@ function viewSetup(){
 const dots = (v, label) => `<span class="dots" role="img" aria-label="${label}: ${v} out of 5">${
   [1,2,3,4,5].map(i => `<span class="${i <= v ? "on" : "off"}" aria-hidden="true">●</span>`).join("")}</span>`;
 // Names for travellers / fabled / loric (never dealt), in the current language.
-const extraName = id => (isAr() && AR.extras?.[id]) || DATA.roles[id]?.name || id;
+const extraName = id => L()?.extras?.[id] || DATA.roles[id]?.name || id;
 // Built at render time so character names follow the language.
 function communityTwists(s){
   const names = (s.expIds || []).map(id => BY_ID[id]?.name).filter(Boolean);
   return names.length ? `Experimental characters: ${names.slice(0, 6).join(", ")}${names.length > 6 ? ` and ${names.length - 6} more` : ""}.` : s.twists;
 }
-// In Arabic, show the original English script name under the translated one.
-const origName = (s, inline) => isAr() && s._en?.name && s._en.name !== s.name
+// In another language, show the original English script name under the translated one.
+const origName = (s, inline) => L() && s._en?.name && s._en.name !== s.name
   ? `${inline ? "<br>" : ""}<span class="muted no-tr orig-name" lang="en" dir="ltr">${esc(s._en.name)}</span>` : "";
 const teamCounts = s => TEAMS.map(t => s.chars.filter(c => c.team === t).length).join(" / ");
 function scriptCard(s){
@@ -2223,26 +2233,53 @@ function trackChanges(){
 }
 const pName = id => esc(playerById(id)?.name ?? "?");
 const cName = id => BY_ID[id] ? `${BY_ID[id].icon} ${esc(BY_ID[id].name)}` : "?";
-const phaseName = ph => ph === 0 ? (isAr() ? "التجهيز" : "Setup") : ph % 2 ? `${isAr() ? "الليلة" : "Night"} ${Math.ceil(ph / 2)}` : `${isAr() ? "اليوم" : "Day"} ${ph / 2}`;
-// One line per event, written directly in both languages.
+const phaseName = ph => ph === 0 ? lx({en:"Setup", ar:"التجهيز", es:"Preparación", it:"Preparazione"})
+  : ph % 2 ? `${lx({en:"Night", ar:"الليلة", es:"Noche", it:"Notte"})} ${Math.ceil(ph / 2)}` : `${lx({en:"Day", ar:"اليوم", es:"Día", it:"Giorno"})} ${ph / 2}`;
+// Words shared by the reveal, past games and the text export.
+const W = {
+  thought:{en:"thought they were", ar:"كان فاكر نفسه", es:"creía ser", it:"credeva di essere"},
+  evilT:{en:"😈 Evil", ar:"😈 شرير", es:"😈 Malvado", it:"😈 Malvagio"}, goodT:{en:"😇 Good", ar:"😇 طيب", es:"😇 Bueno", it:"😇 Buono"},
+  evil:{en:"evil", ar:"شرير", es:"malvado", it:"malvagio"}, good:{en:"good", ar:"طيب", es:"bueno", it:"buono"},
+  alive:{en:"alive", ar:"عايش", es:"vivo", it:"vivo"}, dead:{en:"dead", ar:"ميّت", es:"muerto", it:"morto"},
+  goodWon:{en:"😇 Good won", ar:"😇 الطيبين كسبوا", es:"😇 Ganó el Bien", it:"😇 Ha vinto il Bene"},
+  evilWon:{en:"😈 Evil won", ar:"😈 الأشرار كسبوا", es:"😈 Ganó el Mal", it:"😈 Ha vinto il Male"},
+  unfinished:{en:"Unfinished game", ar:"لعبة مخلصتش", es:"Partida sin terminar", it:"Partita non finita"},
+  close:{en:"Close", ar:"خلاص", es:"Cerrar", it:"Chiudi"}, del:{en:"Delete", ar:"امسحها", es:"Borrar", it:"Elimina"},
+  gameLog:{en:"Game log", ar:"سجل اللعبة", es:"Registro de la partida", it:"Registro della partita"},
+  nothing:{en:"Nothing happened.", ar:"محصلش حاجة.", es:"No pasó nada.", it:"Non è successo niente."},
+  players:{en:"Players:", ar:"اللاعيبة:", es:"Jugadores:", it:"Giocatori:"},
+};
+const listSep = () => isAr() ? "، " : ", ";
+// One line per event, written directly in each language.
 // P = how to turn a player id into a name (past games pass their own saved names).
 function logLine(e, P = pName){
-  const ar = isAr(), C = cName;
+  const C = cName;
   switch (e.k) {
-    case "phase": return ar ? `${isNightPh(e.ph) ? "🌙" : "☀️"} ابتدت ${phaseName(e.ph)}` : `${isNightPh(e.ph) ? "🌙" : "☀️"} ${phaseName(e.ph)} began`;
-    case "died": return ar ? `💀 ${P(e.p)} مات` : `💀 ${P(e.p)} died`;
-    case "executed": return ar ? `⚖️ ${P(e.p)} اتعدم` : `⚖️ ${P(e.p)} was executed`;
-    case "revived": return ar ? `❤️ ${P(e.p)} رجع للحياة` : `❤️ ${P(e.p)} came back to life`;
-    case "char": return ar ? `🔄 ${P(e.p)} اتحوّل من ${C(e.from)} لـ ${C(e.to)}` : `🔄 ${P(e.p)} changed from ${C(e.from)} to ${C(e.to)}`;
-    case "nom": return ar ? `🗳️ ${P(e.by)} رشّح ${P(e.on)}: ${e.count} ${e.count === 1 ? "صوت" : "أصوات"}${e.voters?.length ? ` (${e.voters.map(P).join("، ")})` : ""}`
-      : `🗳️ ${P(e.by)} nominated ${P(e.on)}: ${e.count} vote${e.count === 1 ? "" : "s"}${e.voters?.length ? ` (${e.voters.map(P).join(", ")})` : ""}`;
-    case "pick": {
-      const what = e.yesno ? (e.yesno === "YES" ? (ar ? "آه" : "yes") : (ar ? "لأ" : "no")) : e.none ? (ar ? "محدش" : "no one")
-        : [...(e.players || []).map(P), ...(e.chars || []).map(C)].join(ar ? "، " : ", ");
-      return ar ? `${BY_ID[e.eff]?.icon || "🌙"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)}) اختار: ${what}` : `${BY_ID[e.eff]?.icon || "🌙"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)}) chose ${what}`;
+    case "phase": { const i = isNightPh(e.ph) ? "🌙" : "☀️", n = phaseName(e.ph);
+      return lx({en:`${i} ${n} began`, ar:`${i} ابتدت ${n}`, es:`${i} Empieza: ${n}`, it:`${i} Inizia: ${n}`}); }
+    case "died": return lx({en:`💀 ${P(e.p)} died`, ar:`💀 ${P(e.p)} مات`, es:`💀 ${P(e.p)} ha muerto`, it:`💀 ${P(e.p)} è morto`});
+    case "executed": return lx({en:`⚖️ ${P(e.p)} was executed`, ar:`⚖️ ${P(e.p)} اتعدم`, es:`⚖️ ${P(e.p)} fue ejecutado`, it:`⚖️ ${P(e.p)} è stato giustiziato`});
+    case "revived": return lx({en:`❤️ ${P(e.p)} came back to life`, ar:`❤️ ${P(e.p)} رجع للحياة`, es:`❤️ ${P(e.p)} ha vuelto a la vida`, it:`❤️ ${P(e.p)} è tornato in vita`});
+    case "char": return lx({en:`🔄 ${P(e.p)} changed from ${C(e.from)} to ${C(e.to)}`, ar:`🔄 ${P(e.p)} اتحوّل من ${C(e.from)} لـ ${C(e.to)}`,
+      es:`🔄 ${P(e.p)} pasó de ${C(e.from)} a ${C(e.to)}`, it:`🔄 ${P(e.p)} è passato da ${C(e.from)} a ${C(e.to)}`});
+    case "nom": {
+      const one = e.count === 1, who = e.voters?.length ? ` (${e.voters.map(P).join(listSep())})` : "";
+      return lx({en:`🗳️ ${P(e.by)} nominated ${P(e.on)}: ${e.count} vote${one ? "" : "s"}${who}`,
+        ar:`🗳️ ${P(e.by)} رشّح ${P(e.on)}: ${e.count} ${one ? "صوت" : "أصوات"}${who}`,
+        es:`🗳️ ${P(e.by)} nominó a ${P(e.on)}: ${e.count} voto${one ? "" : "s"}${who}`,
+        it:`🗳️ ${P(e.by)} ha nominato ${P(e.on)}: ${e.count} vot${one ? "o" : "i"}${who}`});
     }
-    case "day": return `${BY_ID[e.eff]?.icon || "☀️"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)}): ${esc(ar ? e.ar : e.en)}`;
-    case "end": return ar ? `🏁 اللعبة خلصت: ${e.winner === "good" ? "الطيبين كسبوا" : "الأشرار كسبوا"}` : `🏁 Game over: ${e.winner === "good" ? "Good wins" : "Evil wins"}`;
+    case "pick": {
+      const what = e.yesno ? (e.yesno === "YES" ? lx({en:"yes", ar:"آه", es:"sí", it:"sì"}) : lx({en:"no", ar:"لأ", es:"no", it:"no"}))
+        : e.none ? lx({en:"no one", ar:"محدش", es:"nadie", it:"nessuno"})
+        : [...(e.players || []).map(P), ...(e.chars || []).map(C)].join(listSep());
+      const who = `${BY_ID[e.eff]?.icon || "🌙"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)})`;
+      return lx({en:`${who} chose ${what}`, ar:`${who} اختار: ${what}`, es:`${who} eligió: ${what}`, it:`${who} ha scelto: ${what}`});
+    }
+    case "day": return `${BY_ID[e.eff]?.icon || "☀️"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)}): ${esc(lx(e))}`;
+    case "end": return e.winner === "good"
+      ? lx({en:"🏁 Game over: Good wins", ar:"🏁 اللعبة خلصت: الطيبين كسبوا", es:"🏁 Fin de la partida: gana el Bien", it:"🏁 Fine partita: vince il Bene"})
+      : lx({en:"🏁 Game over: Evil wins", ar:"🏁 اللعبة خلصت: الأشرار كسبوا", es:"🏁 Fin de la partida: gana el Mal", it:"🏁 Fine partita: vince il Male"});
   }
   return "";
 }
@@ -2254,16 +2291,16 @@ const isNightPh = ph => ph > 0 && ph % 2 === 1;
 // the result, applies it, marks "Ability used", and logs it.
 // ---------------------------------------------------------------------------
 const DAY_ABILITIES = {
-  slayer:{once:true, kind:"pick", n:1, en:"Slayer shoots", ar:"قاتل الشياطين بيضرب", ask:"Who does the Slayer shoot?"},
-  psychopath:{kind:"pick", n:1, perDay:true, en:"Psychopath kills", ar:"السايكو بيقتل", ask:"Who does the Psychopath kill?"},
-  juggler:{once:true, kind:"juggle", en:"Juggler guesses", ar:"البهلوان بيخمّن"},
-  alsaahir:{kind:"many", perDay:true, en:"Alsaahir guesses the evil team", ar:"الساهر بيخمّن الأشرار", ask:"Who do they say are ALL the Minions and the Demon?"},
-  gossip:{kind:"truth", perDay:true, en:"Gossip made a statement", ar:"الرغّاي قال جملة"},
-  artist:{once:true, kind:"used", en:"Artist asked their question", ar:"الفنّان سأل سؤاله"},
-  fisherman:{once:true, kind:"used", en:"Fisherman got advice", ar:"الصيّاد خد نصيحة"},
-  savant:{kind:"used", perDay:true, en:"Savant visited you", ar:"العبقري زارك"},
-  klutz:{once:true, dead:true, kind:"pick", n:1, en:"Klutz chooses (they died)", ar:"اللَّخمة بيختار (مات)", ask:"Who does the Klutz choose?"},
-  moonchild:{once:true, dead:true, kind:"pick", n:1, en:"Moonchild chooses (they died)", ar:"بنت القمر بتختار (ماتت)", ask:"Who does the Moonchild choose?"},
+  slayer:{once:true, kind:"pick", n:1, en:"Slayer shoots", ar:"قاتل الشياطين بيضرب", es:"El Cazademonios dispara", it:"L'Ammazzademoni spara", ask:"Who does the Slayer shoot?"},
+  psychopath:{kind:"pick", n:1, perDay:true, en:"Psychopath kills", ar:"السايكو بيقتل", es:"El Psicópata mata", it:"Lo Psicopatico uccide", ask:"Who does the Psychopath kill?"},
+  juggler:{once:true, kind:"juggle", en:"Juggler guesses", ar:"البهلوان بيخمّن", es:"El Malabarista adivina", it:"Il Giocoliere indovina"},
+  alsaahir:{kind:"many", perDay:true, en:"Alsaahir guesses the evil team", ar:"الساهر بيخمّن الأشرار", es:"El Alsaahir adivina el equipo malvado", it:"L'Alsaahir indovina la squadra malvagia", ask:"Who do they say are ALL the Minions and the Demon?"},
+  gossip:{kind:"truth", perDay:true, en:"Gossip made a statement", ar:"الرغّاي قال جملة", es:"El Chismoso hizo una afirmación", it:"Il Pettegolo ha fatto un'affermazione"},
+  artist:{once:true, kind:"used", en:"Artist asked their question", ar:"الفنّان سأل سؤاله", es:"El Artista hizo su pregunta", it:"L'Artista ha fatto la sua domanda"},
+  fisherman:{once:true, kind:"used", en:"Fisherman got advice", ar:"الصيّاد خد نصيحة", es:"El Pescador recibió un consejo", it:"Il Pescatore ha ricevuto un consiglio"},
+  savant:{kind:"used", perDay:true, en:"Savant visited you", ar:"العبقري زارك", es:"El Erudito te visitó", it:"L'Erudito ti ha fatto visita"},
+  klutz:{once:true, dead:true, kind:"pick", n:1, en:"Klutz chooses (they died)", ar:"اللَّخمة بيختار (مات)", es:"El Torpe elige (ha muerto)", it:"Il Maldestro sceglie (è morto)", ask:"Who does the Klutz choose?"},
+  moonchild:{once:true, dead:true, kind:"pick", n:1, en:"Moonchild chooses (they died)", ar:"بنت القمر بتختار (ماتت)", es:"La Hija de la Luna elige (ha muerto)", it:"La Figlia della Luna sceglie (è morta)", ask:"Who does the Moonchild choose?"},
 };
 function dayAbilityList(){
   const d = dayState(), out = [];
@@ -2277,7 +2314,7 @@ function dayAbilityList(){
   // Damsel: any living Minion may publicly guess the Damsel once.
   if (CHARS.some(c => c.id === "damsel") || inPlay("damsel"))
     state.players.filter(p => p.alive && charOf(p)?.team === "minion" && !hasRem(p, "Guess Used"))
-      .forEach(p => out.push({p, id:"damselguess", a:{kind:"pick", n:1, en:`Minion guesses the ${BY_ID.damsel.name}`, ar:`تابع بيخمّن ${BY_ID.damsel.name}`, ask:`Who do they say is the ${BY_ID.damsel.name}?`}}));
+      .forEach(p => out.push({p, id:"damselguess", a:{kind:"pick", n:1, en:`Minion guesses the ${BY_ID.damsel.name}`, ar:`تابع بيخمّن مين ${BY_ID.damsel.name}`, es:`Un Esbirro adivina quién es ${BY_ID.damsel.name}`, it:`Un Seguace indovina chi è ${BY_ID.damsel.name}`, ask:`Who do they say is the ${BY_ID.damsel.name}?`}}));
   return out;
 }
 const abilityWorks = p => charOf(p)?.id === effective(p)?.id && !hasRem(p, "Poisoned") && !p.reminders.some(r => r.startsWith("Drunk"));
@@ -2291,7 +2328,7 @@ function dayAbilitiesHtml(){
   if (open) {
     const it = list.find(x => x.p.id === open.pid && x.id === open.id) || {p:playerById(open.pid), id:open.id, a:open.a};
     const a = it.a, p = it.p;
-    h += `<div class="vote-box"><p class="vote-title">${esc(BY_ID[it.id]?.icon || "🎯")} ${esc(p.name)}: ${esc(isAr() ? a.ar : a.en)}</p>`;
+    h += `<div class="vote-box"><p class="vote-title">${esc(BY_ID[it.id]?.icon || "🎯")} ${esc(p.name)}: ${esc(lx(a))}</p>`;
     if (a.kind === "pick" || a.kind === "many") {
       h += `<p class="muted">${esc(a.ask)}</p><div class="pick-grid">${state.players.filter(q => (q.id !== p.id || a.kind === "many") && (!a.dead || q.alive)).map(q =>
         `<button class="pick-btn" data-action="ab-sel" data-id="${q.id}" aria-pressed="${open.sel.includes(q.id)}">${q.alive ? "" : "💀 "}${esc(q.name)}</button>`).join("")}</div>
@@ -2311,70 +2348,97 @@ function dayAbilitiesHtml(){
     }
     return h + `</div>`;
   }
-  h += `<div class="row">${list.map(x => `<button data-action="ab-open" data-id="${x.p.id}" data-ab="${x.id}">${BY_ID[x.id]?.icon || "🎯"} ${esc(x.p.name)}: ${esc(isAr() ? x.a.ar : x.a.en)}</button>`).join("")}</div>`;
+  h += `<div class="row">${list.map(x => `<button data-action="ab-open" data-id="${x.p.id}" data-ab="${x.id}">${BY_ID[x.id]?.icon || "🎯"} ${esc(x.p.name)}: ${esc(lx(x.a))}</button>`).join("")}</div>`;
   return h;
 }
 
 // Work out and apply a day ability. Returns {cls, html, buttons}.
 function resolveDayAbility(d, open, v){
   const p = playerById(open.pid), id = open.id, a = open.a, works = abilityWorks(p), sel = open.sel.map(playerById);
-  const t = sel[0], ar = isAr();
-  const log = (en, arTxt) => logEvent("day", {p:p.id, eff:id === "damselguess" ? "damsel" : id, en, ar:arTxt});
+  const t = sel[0];
+  // Day-ability log lines are stored in every language, so the log reads right after switching.
+  const log = o => logEvent("day", {p:p.id, eff:id === "damselguess" ? "damsel" : id, ...o});
+  const nm = n => BY_ID[n]?.name || n;
+  const endBtn = side => side === "good"
+    ? `<button class="primary" data-action="end-game" data-v="good">🏁 ${lx({en:"End game: Good wins", ar:"خلّص اللعبة: الطيبين كسبوا", es:"Terminar la partida: gana el Bien", it:"Termina la partita: vince il Bene"})}</button>`
+    : `<button class="primary" data-action="end-game" data-v="evil">🏁 ${lx({en:"End game: Evil wins", ar:"خلّص اللعبة: الأشرار كسبوا", es:"Terminar la partida: gana el Mal", it:"Termina la partita: vince il Male"})}</button>`;
+  const nothing = lx({en:"Nothing happens.", ar:"محصلش حاجة.", es:"No pasa nada.", it:"Non succede niente."});
   if (a.once) toggleRem(p, "Ability used", true);
   if (a.perDay) (d.used ||= {})[p.id] = true;
   switch (id) {
     case "slayer": {
-      if (works && isDemon(t)) { t.alive = false; log(`shot ${t.name}, who was the Demon and died`, `ضرب ${t.name}، وكان الشيطان ومات`);
-        return {cls:"ok", html:`🎯 ${esc(t.name)} ${ar ? "كان الشيطان ومات!" : "was the Demon and dies!"}${inPlay("scarletwoman") ? `<br>${ar ? "خلّي بالك: الست الحرباية ممكن تبقى الشيطان." : "Careful: the Scarlet Woman may become the Demon."}` : ""}`}; }
-      log(`shot ${t.name}: nothing happened`, `ضرب ${t.name}: محصلش حاجة`);
+      if (works && isDemon(t)) { t.alive = false;
+        log({en:`shot ${t.name}, who was the Demon and died`, ar:`ضرب ${t.name}، وكان الشيطان ومات`, es:`disparó a ${t.name}, que era el Demonio y murió`, it:`ha sparato a ${t.name}, che era il Demone ed è morto`});
+        return {cls:"ok", html:`🎯 ${esc(t.name)} ${lx({en:"was the Demon and dies!", ar:"كان الشيطان ومات!", es:"era el Demonio y muere.", it:"era il Demone e muore!"})}${inPlay("scarletwoman")
+          ? `<br>${lx({en:"Careful: the Scarlet Woman may become the Demon.", ar:"خلّي بالك: الست الحرباية ممكن تبقى الشيطان.",
+            es:`Ojo: ${esc(nm("scarletwoman"))} puede convertirse en el Demonio.`, it:`Attenzione: ${esc(nm("scarletwoman"))} può diventare il Demone.`})}` : ""}`}; }
+      log({en:`shot ${t.name}: nothing happened`, ar:`ضرب ${t.name}: محصلش حاجة`, es:`disparó a ${t.name}: no pasó nada`, it:`ha sparato a ${t.name}: non è successo niente`});
       const rec = works && t.char === "recluse";
-      return {cls:"warn", html:`🎯 ${ar ? "محصلش حاجة." : "Nothing happens."}${!works ? ` ${ar ? "(قدرته مش شغّالة: سكران أو مسموم)" : "(their ability doesn't work: drunk or poisoned)"}` : ""}${rec ? `<br>${ar ? "المنعزل ممكن يظهر كأنه الشيطان، لو حبّيت." : "The Recluse may register as the Demon if you want."}` : ""}`,
-        buttons:rec ? `<button class="danger" data-action="ab-kill" data-id="${t.id}">💀 ${esc(t.name)} ${ar ? "يموت" : "dies"}</button>` : ""};
+      return {cls:"warn", html:`🎯 ${nothing}${!works ? ` ${lx({en:"(their ability doesn't work: drunk or poisoned)", ar:"(قدرته مش شغّالة: سكران أو مسموم)",
+          es:"(su habilidad no funciona: está borracho o envenenado)", it:"(la sua abilità non funziona: è ubriaco o avvelenato)"})}` : ""}${rec
+          ? `<br>${lx({en:"The Recluse may register as the Demon if you want.", ar:"المنعزل ممكن يظهر كأنه الشيطان، لو حبّيت.",
+            es:`${esc(nm("recluse"))} puede contar como el Demonio si quieres.`, it:`${esc(nm("recluse"))} può risultare come il Demone, se vuoi.`})}` : ""}`,
+        buttons:rec ? `<button class="danger" data-action="ab-kill" data-id="${t.id}">💀 ${esc(t.name)} ${lx({en:"dies", ar:"يموت", es:"muere", it:"muore"})}</button>` : ""};
     }
     case "psychopath":
-      if (works) { t.alive = false; log(`killed ${t.name}`, `قتل ${t.name}`); return {cls:"warn", html:`🔪 ${esc(t.name)} ${ar ? "مات." : "dies."}`}; }
-      log(`chose ${t.name}, but their ability doesn't work`, `اختار ${t.name}، بس قدرته مش شغّالة`);
-      return {cls:"warn", html:ar ? "محصلش حاجة (سكران أو مسموم)." : "Nothing happens (drunk or poisoned)."};
+      if (works) { t.alive = false; log({en:`killed ${t.name}`, ar:`قتل ${t.name}`, es:`mató a ${t.name}`, it:`ha ucciso ${t.name}`});
+        return {cls:"warn", html:`🔪 ${esc(t.name)} ${lx({en:"dies.", ar:"مات.", es:"muere.", it:"muore."})}`}; }
+      log({en:`chose ${t.name}, but their ability doesn't work`, ar:`اختار ${t.name}، بس قدرته مش شغّالة`, es:`eligió a ${t.name}, pero su habilidad no funciona`, it:`ha scelto ${t.name}, ma la sua abilità non funziona`});
+      return {cls:"warn", html:lx({en:"Nothing happens (drunk or poisoned).", ar:"محصلش حاجة (سكران أو مسموم).", es:"No pasa nada (borracho o envenenado).", it:"Non succede niente (ubriaco o avvelenato)."})};
     case "alsaahir": {
       const evil = state.players.filter(q => ["minion","demon"].includes(charOf(q)?.team)).map(q => q.id).sort().join();
       const right = works && sel.map(q => q.id).sort().join() === evil;
-      log(`guessed ${sel.map(q => q.name).join(", ")}: ${right ? "correct" : "wrong"}`, `خمّن ${sel.map(q => q.name).join("، ")}: ${right ? "صح" : "غلط"}`);
-      return right ? {cls:"ok", html:`🧞 ${ar ? "التخمين صح: الطيبين كسبوا!" : "Correct: Good wins!"}`, buttons:`<button class="primary" data-action="end-game" data-v="good">🏁 ${ar ? "خلّص اللعبة: الطيبين كسبوا" : "End game: Good wins"}</button>`}
-        : {cls:"warn", html:`🧞 ${ar ? "التخمين غلط. محصلش حاجة." : "Wrong. Nothing happens."}`};
+      const en = sel.map(q => q.name).join(", "), arN = sel.map(q => q.name).join("، ");
+      log({en:`guessed ${en}: ${right ? "correct" : "wrong"}`, ar:`خمّن ${arN}: ${right ? "صح" : "غلط"}`,
+        es:`adivinó ${en}: ${right ? "correcto" : "incorrecto"}`, it:`ha indovinato ${en}: ${right ? "giusto" : "sbagliato"}`});
+      return right ? {cls:"ok", html:`🧞 ${lx({en:"Correct: Good wins!", ar:"التخمين صح: الطيبين كسبوا!", es:"¡Correcto: gana el Bien!", it:"Giusto: vince il Bene!"})}`, buttons:endBtn("good")}
+        : {cls:"warn", html:`🧞 ${lx({en:"Wrong. Nothing happens.", ar:"التخمين غلط. محصلش حاجة.", es:"Incorrecto. No pasa nada.", it:"Sbagliato. Non succede niente."})}`};
     }
     case "damselguess": {
       toggleRem(p, "Guess Used", true);
       const right = t.char === "damsel" && abilityWorks(t);
-      log(`guessed ${t.name} as the Damsel: ${right ? "correct" : "wrong"}`, `خمّن إن ${t.name} هي الآنسة: ${right ? "صح" : "غلط"}`);
-      return right ? {cls:"bad", html:`👰 ${ar ? "صح! الأشرار كسبوا." : "Correct! Evil wins."}`, buttons:`<button class="primary" data-action="end-game" data-v="evil">🏁 ${ar ? "خلّص اللعبة: الأشرار كسبوا" : "End game: Evil wins"}</button>`}
-        : {cls:"warn", html:`👰 ${ar ? "غلط. محصلش حاجة." : "Wrong. Nothing happens."}`};
+      log({en:`guessed ${t.name} as the Damsel: ${right ? "correct" : "wrong"}`, ar:`خمّن إن ${t.name} هي الآنسة: ${right ? "صح" : "غلط"}`,
+        es:`dijo que ${t.name} es la ${nm("damsel")}: ${right ? "correcto" : "incorrecto"}`, it:`ha detto che ${t.name} è la ${nm("damsel")}: ${right ? "giusto" : "sbagliato"}`});
+      return right ? {cls:"bad", html:`👰 ${lx({en:"Correct! Evil wins.", ar:"صح! الأشرار كسبوا.", es:"¡Correcto! Gana el Mal.", it:"Giusto! Vince il Male."})}`, buttons:endBtn("evil")}
+        : {cls:"warn", html:`👰 ${lx({en:"Wrong. Nothing happens.", ar:"غلط. محصلش حاجة.", es:"Incorrecto. No pasa nada.", it:"Sbagliato. Non succede niente."})}`};
     }
     case "klutz": {
       const bad = works && isEvil(t);
-      log(`chose ${t.name}: ${bad ? "evil, so good loses" : "good, nothing happens"}`, `اختار ${t.name}: ${bad ? "شرير، فالطيبين خسروا" : "طيب، محصلش حاجة"}`);
-      return bad ? {cls:"bad", html:`🍌 ${ar ? "اختار شرير: الطيبين خسروا." : "They chose an evil player: Good loses."}`, buttons:`<button class="primary" data-action="end-game" data-v="evil">🏁 ${ar ? "خلّص اللعبة: الأشرار كسبوا" : "End game: Evil wins"}</button>`}
-        : {cls:"ok", html:`🍌 ${ar ? "اختار طيب. محصلش حاجة." : "They chose a good player. Nothing happens."}`};
+      log({en:`chose ${t.name}: ${bad ? "evil, so good loses" : "good, nothing happens"}`, ar:`اختار ${t.name}: ${bad ? "شرير، فالطيبين خسروا" : "طيب، محصلش حاجة"}`,
+        es:`eligió a ${t.name}: ${bad ? "malvado, así que pierde el Bien" : "bueno, no pasa nada"}`, it:`ha scelto ${t.name}: ${bad ? "malvagio, quindi perde il Bene" : "buono, non succede niente"}`});
+      return bad ? {cls:"bad", html:`🍌 ${lx({en:"They chose an evil player: Good loses.", ar:"اختار شرير: الطيبين خسروا.", es:"Eligió a un jugador malvado: pierde el Bien.", it:"Ha scelto un giocatore malvagio: perde il Bene."})}`, buttons:endBtn("evil")}
+        : {cls:"ok", html:`🍌 ${lx({en:"They chose a good player. Nothing happens.", ar:"اختار طيب. محصلش حاجة.", es:"Eligió a un jugador bueno. No pasa nada.", it:"Ha scelto un giocatore buono. Non succede niente."})}`};
     }
     case "moonchild": {
       const dies = works && !isEvil(t);
       if (dies) toggleRem(t, "Dies tonight (Moonchild)", true);
-      log(`chose ${t.name}: ${dies ? "good, so they die tonight" : "evil, nothing happens"}`, `اختارت ${t.name}: ${dies ? "طيب، فهيموت الليلة" : "شرير، محصلش حاجة"}`);
-      return {cls:dies ? "warn" : "ok", html:`🌙 ${dies ? (ar ? `${esc(t.name)} طيب: هيموت الليلة (اتحطّت علامة).` : `${esc(t.name)} is good: they die tonight (marked).`) : (ar ? "اختارت شرير. محصلش حاجة." : "They chose an evil player. Nothing happens.")}`};
+      log({en:`chose ${t.name}: ${dies ? "good, so they die tonight" : "evil, nothing happens"}`, ar:`اختارت ${t.name}: ${dies ? "طيب، فهيموت الليلة" : "شرير، محصلش حاجة"}`,
+        es:`eligió a ${t.name}: ${dies ? "bueno, así que muere esta noche" : "malvado, no pasa nada"}`, it:`ha scelto ${t.name}: ${dies ? "buono, quindi muore stanotte" : "malvagio, non succede niente"}`});
+      return {cls:dies ? "warn" : "ok", html:`🌙 ${dies
+        ? lx({en:`${esc(t.name)} is good: they die tonight (marked).`, ar:`${esc(t.name)} طيب: هيموت الليلة (اتحطّت علامة).`,
+          es:`${esc(t.name)} es bueno: muere esta noche (marcado).`, it:`${esc(t.name)} è buono: muore stanotte (segnato).`})
+        : lx({en:"They chose an evil player. Nothing happens.", ar:"اختارت شرير. محصلش حاجة.", es:"Eligió a un jugador malvado. No pasa nada.", it:"Ha scelto un giocatore malvagio. Non succede niente."})}`};
     }
     case "juggler": {
       const pairs = open.pairs.filter(g => g.p && g.c);
-      const n = pairs.filter(g => playerById(g.p)?.char === g.c).length;
+      const n = pairs.filter(g => playerById(g.p)?.char === g.c).length, of = pairs.length;
       (state.juggle ||= {})[p.id] = works ? n : null;
-      log(`guessed ${pairs.length} (${n} correct)`, `خمّن ${pairs.length} (${n} صح)`);
-      return {cls:"ok", html:`🤹 ${ar ? `${n} من ${pairs.length} صح. هيتعرض الرقم ده الليلة في خطوة البهلوان.` : `${n} of ${pairs.length} correct. The number will be ready at the Juggler's night step.`}${!works ? ` ${ar ? "(قدرته مش شغّالة: ادّيله رقم غلط)" : "(their ability doesn't work: give a wrong number)"}` : ""}`};
+      log({en:`guessed ${of} (${n} correct)`, ar:`خمّن ${of} (${n} صح)`, es:`adivinó ${of} (${n} correctos)`, it:`ha indovinato ${of} (${n} giusti)`});
+      return {cls:"ok", html:`🤹 ${lx({en:`${n} of ${of} correct. The number will be ready at the Juggler's night step.`, ar:`${n} من ${of} صح. هيتعرض الرقم ده الليلة في خطوة البهلوان.`,
+        es:`${n} de ${of} correctos. El número estará listo en el paso nocturno de ${nm("juggler")}.`, it:`${n} su ${of} giusti. Il numero sarà pronto nel passo notturno di ${nm("juggler")}.`})}${!works
+        ? ` ${lx({en:"(their ability doesn't work: give a wrong number)", ar:"(قدرته مش شغّالة: ادّيله رقم غلط)", es:"(su habilidad no funciona: dale un número falso)", it:"(la sua abilità non funziona: dagli un numero sbagliato)"})}` : ""}`};
     }
     case "gossip":
       if (v === "true") (d.gossipTrue ||= []).push(p.id);
-      log(`statement was ${v === "true" ? "true" : "false"}`, `الجملة كانت ${v === "true" ? "صح" : "غلط"}`);
-      return {cls:"ok", html:`🗣️ ${v === "true" ? (ar ? "الجملة صح: حد هيموت الليلة (هتلاقيها في خطوة الرغّاي)." : "True: someone dies tonight (shown at the Gossip's night step).") : (ar ? "الجملة غلط: محدش بيموت." : "False: nobody dies from it.")}`};
+      log(v === "true" ? {en:"statement was true", ar:"الجملة كانت صح", es:"la afirmación era cierta", it:"l'affermazione era vera"}
+        : {en:"statement was false", ar:"الجملة كانت غلط", es:"la afirmación era falsa", it:"l'affermazione era falsa"});
+      return {cls:"ok", html:`🗣️ ${v === "true"
+        ? lx({en:"True: someone dies tonight (shown at the Gossip's night step).", ar:"الجملة صح: حد هيموت الليلة (هتلاقيها في خطوة الرغّاي).",
+          es:`Cierta: alguien muere esta noche (aparece en el paso nocturno de ${nm("gossip")}).`, it:`Vera: qualcuno muore stanotte (lo trovi nel passo notturno di ${nm("gossip")}).`})
+        : lx({en:"False: nobody dies from it.", ar:"الجملة غلط: محدش بيموت.", es:"Falsa: nadie muere por ella.", it:"Falsa: nessuno muore per questo."})}`};
     default:
-      log("used their ability", "استخدم قدرته");
-      return {cls:"ok", html:`✓ ${ar ? "اتسجّل." : "Recorded."}`};
+      log({en:"used their ability", ar:"استخدم قدرته", es:"usó su habilidad", it:"ha usato la sua abilità"});
+      return {cls:"ok", html:`✓ ${lx({en:"Recorded.", ar:"اتسجّل.", es:"Anotado.", it:"Registrato."})}`};
   }
 }
 
@@ -2423,20 +2487,19 @@ function suggestedWinner(){
 }
 function revealHtml(){
   const e = state.ended; if (!e) return "";
-  const ar = isAr();
   const rows = state.players.map(p => {
     const c = charOf(p), ef = effective(p), evil = isEvil(p);
-    return `<tr class="${evil ? "evil" : "good"}"><td>${esc(p.name)}</td><td>${c ? `${c.icon} ${esc(c.name)}` : "?"}${c?.thinks && ef ? ` <small class="muted">(${ar ? "كان فاكر نفسه" : "thought they were"} ${esc(ef.name)})</small>` : ""}</td>
-      <td>${evil ? (ar ? "😈 شرير" : "😈 Evil") : (ar ? "😇 طيب" : "😇 Good")}</td><td>${p.alive ? (ar ? "عايش" : "alive") : "💀"}</td></tr>`;
+    return `<tr class="${evil ? "evil" : "good"}"><td>${esc(p.name)}</td><td>${c ? `${c.icon} ${esc(c.name)}` : "?"}${c?.thinks && ef ? ` <small class="muted">(${lx(W.thought)} ${esc(ef.name)})</small>` : ""}</td>
+      <td>${lx(evil ? W.evilT : W.goodT)}</td><td>${p.alive ? lx(W.alive) : "💀"}</td></tr>`;
   }).join("");
   return `<div class="overlay reveal" role="dialog" aria-modal="true" aria-label="Game over">
     <div class="composer-box">
       <div class="big-icon" aria-hidden="true">${e.winner === "good" ? "😇" : "😈"}</div>
-      <h2>${e.winner === "good" ? (ar ? "الطيبين كسبوا!" : "Good wins!") : (ar ? "الأشرار كسبوا!" : "Evil wins!")}</h2>
-      <p class="muted">${ar ? "مين كان مين" : "Who was who"} · ${phaseName(e.ph)}</p>
+      <h2>${e.winner === "good" ? lx({en:"Good wins!", ar:"الطيبين كسبوا!", es:"¡Gana el Bien!", it:"Vince il Bene!"}) : lx({en:"Evil wins!", ar:"الأشرار كسبوا!", es:"¡Gana el Mal!", it:"Vince il Male!"})}</h2>
+      <p class="muted">${lx({en:"Who was who", ar:"مين كان مين", es:"Quién era quién", it:"Chi era chi"})} · ${phaseName(e.ph)}</p>
       <table class="reveal-table"><tbody>${rows}</tbody></table>
-      <div class="row"><button class="primary big" data-action="reveal-close">✅ ${ar ? "خلاص" : "Close"}</button>
-        <button data-action="tab" data-tab="log">📜 ${ar ? "سجل اللعبة" : "Game log"}</button></div>
+      <div class="row"><button class="primary big" data-action="reveal-close">✅ ${lx(W.close)}</button>
+        <button data-action="tab" data-tab="log">📜 ${lx(W.gameLog)}</button></div>
     </div></div>`;
 }
 function endGameButtons(){
@@ -2459,7 +2522,7 @@ function logHtml(log, P = pName){
   (log || []).forEach(e => (byPh[e.ph] ||= []).push(e));
   const phs = Object.keys(byPh).map(Number).sort((a, b) => b - a);
   return phs.length ? phs.map(ph => `<h3>${phaseName(ph)}</h3><ul class="log-list">${byPh[ph].filter(e => e.k !== "phase").map(e => `<li>${logLine(e, P)}</li>`).join("")
-    || `<li class="muted">${isAr() ? "محصلش حاجة." : "Nothing happened."}</li>`}</ul>`).join("") : `<p class="muted">Nothing logged yet.</p>`;
+    || `<li class="muted">${lx(W.nothing)}</li>`}</ul>`).join("") : `<p class="muted">Nothing logged yet.</p>`;
 }
 function viewLog(){
   return `<section class="panel"><h2>📜 Game log</h2>
@@ -2500,22 +2563,22 @@ function gameRecord(){
 
 // Plain-text version of a game (players, then the log in time order) for copying or downloading.
 function gameText(g){
-  const ar = isAr(), sep = ar ? "، " : ", ";
+  const sep = listSep();
   const P = id => esc(g.players.find(x => x.id === id)?.name ?? "?");
   const toText = html => new DOMParser().parseFromString(html, "text/html").body.textContent;
   const out = [`${historyScriptName(g)} · ${fmtDate(g.start)}`,
-    g.winner === "good" ? (ar ? "😇 الطيبين كسبوا" : "😇 Good won") : g.winner === "evil" ? (ar ? "😈 الأشرار كسبوا" : "😈 Evil won") : (ar ? "لعبة مخلصتش" : "Unfinished game"),
-    "", ar ? "اللاعيبة:" : "Players:"];
+    lx(g.winner === "good" ? W.goodWon : g.winner === "evil" ? W.evilWon : W.unfinished),
+    "", lx(W.players)];
   g.players.forEach(p => {
     const c = BY_ID[p.char], fake = c?.thinks && BY_ID[p.drunkAs], evil = ["minion","demon"].includes(c?.team);
-    out.push(`- ${p.name}: ${c ? c.name : "?"}${fake ? ` (${ar ? "كان فاكر نفسه" : "thought they were"} ${fake.name})` : ""}`
-      + `${sep}${evil ? (ar ? "شرير" : "evil") : (ar ? "طيب" : "good")}${sep}${p.alive ? (ar ? "عايش" : "alive") : (ar ? "ميّت" : "dead")}`);
+    out.push(`- ${p.name}: ${c ? c.name : "?"}${fake ? ` (${lx(W.thought)} ${fake.name})` : ""}`
+      + `${sep}${lx(evil ? W.evil : W.good)}${sep}${lx(p.alive ? W.alive : W.dead)}`);
   });
   const byPh = {};
   (g.log || []).forEach(e => (byPh[e.ph] ||= []).push(e));
   Object.keys(byPh).map(Number).sort((a, b) => a - b).forEach(ph => {
     const lines = byPh[ph].filter(e => e.k !== "phase").map(e => `- ${toText(logLine(e, P))}`);
-    out.push("", `${phaseName(ph)}:`, ...(lines.length ? lines : [`- ${ar ? "محصلش حاجة." : "Nothing happened."}`]));
+    out.push("", `${phaseName(ph)}:`, ...(lines.length ? lines : [`- ${lx(W.nothing)}`]));
   });
   return out.join("\n") + "\n";
 }
@@ -2530,11 +2593,11 @@ function downloadText(name, text){
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-const fmtDate = t => new Date(t).toLocaleString(isAr() ? "ar-EG-u-nu-latn" : undefined, {dateStyle:"medium", timeStyle:"short"});
+const fmtDate = t => new Date(t).toLocaleString(LOCALE[L() ? state.lang : "en"], {dateStyle:"medium", timeStyle:"short"});
 const historyScriptName = g => SCRIPTS[g.script]?.name || g.scriptName || "?";
 
 function pastGamesHtml(){
-  const h = loadHistory(), ar = isAr();
+  const h = loadHistory();
   return `<section class="panel"><h2>📚 Past games</h2>
     ${h.length ? `<ul class="past-list">${h.map(g => `<li>
         <div><b>${esc(historyScriptName(g))}</b> · <span class="no-tr">${esc(fmtDate(g.start))}</span><br>
@@ -2548,23 +2611,22 @@ function pastGamesHtml(){
 }
 
 function pastHtml(g){
-  const ar = isAr();
   const P = id => esc(g.players.find(x => x.id === id)?.name ?? "?");
   const rows = g.players.map(p => {
     const c = BY_ID[p.char], fake = c?.thinks && BY_ID[p.drunkAs], evil = ["minion","demon"].includes(c?.team);
-    return `<tr class="${evil ? "evil" : "good"}"><td>${esc(p.name)}</td><td>${c ? `${c.icon} ${esc(c.name)}` : "?"}${fake ? ` <small class="muted">(${ar ? "كان فاكر نفسه" : "thought they were"} ${esc(fake.name)})</small>` : ""}</td>
-      <td>${evil ? (ar ? "😈 شرير" : "😈 Evil") : (ar ? "😇 طيب" : "😇 Good")}</td><td>${p.alive ? (ar ? "عايش" : "alive") : "💀"}</td></tr>`;
+    return `<tr class="${evil ? "evil" : "good"}"><td>${esc(p.name)}</td><td>${c ? `${c.icon} ${esc(c.name)}` : "?"}${fake ? ` <small class="muted">(${lx(W.thought)} ${esc(fake.name)})</small>` : ""}</td>
+      <td>${lx(evil ? W.evilT : W.goodT)}</td><td>${p.alive ? lx(W.alive) : "💀"}</td></tr>`;
   }).join("");
   return `<div class="overlay reveal" role="dialog" aria-modal="true" aria-label="Past game">
     <div class="composer-box">
       <p class="muted"><b>${esc(historyScriptName(g))}</b> · <span class="no-tr">${esc(fmtDate(g.start))}</span></p>
-      <h2>${g.winner === "good" ? (ar ? "😇 الطيبين كسبوا" : "😇 Good won") : g.winner === "evil" ? (ar ? "😈 الأشرار كسبوا" : "😈 Evil won") : (ar ? "لعبة مخلصتش" : "Unfinished game")}</h2>
+      <h2>${lx(g.winner === "good" ? W.goodWon : g.winner === "evil" ? W.evilWon : W.unfinished)}</h2>
       <table class="reveal-table"><tbody>${rows}</tbody></table>
-      <h2>📜 ${ar ? "سجل اللعبة" : "Game log"}</h2>
+      <h2>📜 ${lx(W.gameLog)}</h2>
       ${logHtml(g.log, P)}
       ${logExportButtons(g.id)}
-      <div class="row"><button class="primary big" data-action="past-close">✅ ${ar ? "خلاص" : "Close"}</button>
-        <button class="danger" data-action="past-delete" data-id="${g.id}">🗑 ${ar ? "امسحها" : "Delete"}</button></div>
+      <div class="row"><button class="primary big" data-action="past-close">✅ ${lx(W.close)}</button>
+        <button class="danger" data-action="past-delete" data-id="${g.id}">🗑 ${lx(W.del)}</button></div>
     </div></div>`;
 }
 
@@ -2611,7 +2673,7 @@ function viewScript(){
   const first = sorted([{o:sheetPos("minioninfo", 1), t:"🧑‍🤝‍🧑 Minion info (7+)"}, {o:sheetPos("demoninfo", 2), t:"😈 Demon info + bluffs (7+)"}, ...orderOf("first")]);
   const jinx = [];
   CHARS.forEach(a => Object.entries(DATA.jinxes[a.id] || {}).forEach(([b, why]) => {
-    const reason = (isAr() && AR.jinx?.[`${a.id}|${b}`]) || why;
+    const reason = L()?.jinx?.[`${a.id}|${b}`] || why;
     if (CHARS.some(c => c.id === b)) jinx.push(`<li><b>${esc(a.name)} & ${esc(BY_ID[b]?.name ?? b)}:</b> ${esc(reason)}</li>`);
   }));
   return `<section class="panel sheet">
@@ -2684,13 +2746,11 @@ function render(){
   const ovScroll = document.querySelector("#overlay .overlay")?.scrollTop || 0; // keep the builder's scroll position
   $("#overlay").innerHTML = overlayHtml();
   if (composer || prompt?.stage === "pick") { const ov = document.querySelector("#overlay .overlay"); if (ov) ov.scrollTop = ovScroll; }
-  const lb = $("#langBtn");
-  lb.hidden = !AR;
-  lb.textContent = isAr() ? "🌐 English" : "🌐 عربي مصري";
-  lb.setAttribute("lang", isAr() ? "en" : "ar");
-  lb.setAttribute("aria-label", isAr() ? "Switch to English" : "التبديل للعربي المصري");
+  const ls = $("#langSel");
+  ls.closest("p").hidden = LANG_NAMES.length < 2;
+  ls.innerHTML = LANG_NAMES.map(([k, n]) => `<option value="${k}" lang="${k}" ${k === (L() ? state.lang : "en") ? "selected" : ""}>${n}</option>`).join("");
   ["header", "#tabs", "#view", "#overlay", "footer"].forEach(s => translateDom(document.querySelector(s)));
-  document.title = isAr() ? `${SCRIPT.name} — كتاب الراوي` : document.title;
+  document.title = L() ? `${SCRIPT.name} — ${lx({en:"", ar:"كتاب الراوي", es:"Grimorio del Narrador", it:"Grimorio del Narratore"})}` : document.title;
   if (composer) {
     // Keep keyboard focus where the Storyteller was (or start on the title field).
     (refocus && document.querySelector(`#overlay ${refocus}`) || (!refocus && $("#cLabel")))?.focus?.({preventScroll:true});
@@ -2773,7 +2833,6 @@ document.addEventListener("click", e => {
       break;
     case "pick-script": setScript(b.dataset.script); importMsg = null; break;
     case "import-script": importMsg = importScript($("#importJson").value.trim()); applyLang(); break;
-    case "toggle-lang": state.lang = isAr() ? "en" : "ar"; state.advice = {}; applyLang(); break;
     case "remove-script": {
       const sid = b.dataset.script, s = SCRIPTS[sid];
       if (!s || !confirm(`Remove the imported script "${s.name}"?`)) return;
@@ -2929,7 +2988,7 @@ document.addEventListener("click", e => {
         downloadText(`botc-${(g.scriptName || g.script || "game").replace(/[^\w-]+/g, "-").toLowerCase()}-${day}.txt`, text);
         return;
       }
-      const done = () => { b.textContent = isAr() ? "اتنسخ ✓" : "Copied ✓"; };
+      const done = () => { b.textContent = lx({en:"Copied ✓", ar:"اتنسخ ✓", es:"Copiado ✓", it:"Copiato ✓"}); };
       (navigator.clipboard?.writeText(text) ?? Promise.reject()).then(done, () => {
         const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", "");
         ta.style.position = "fixed"; ta.style.opacity = "0"; document.body.appendChild(ta);
@@ -2968,6 +3027,7 @@ document.addEventListener("change", e => {
     case "p-drunk": p.drunkAs = el.value || null; break;
     case "p-rem": toggleRem(p, el.dataset.rem, el.checked); break;
     case "step": state.done[el.dataset.key] = el.checked; break;
+    case "lang": state.lang = el.value; state.advice = {}; applyLang(); break;
     case "deal-seat": state.deal.seat = el.value; break;
     case "draft-fake": if (state.draft) { state.draft.drunkAs[el.dataset.id] = el.value; draftFixFakes(state.draft); } break;
     case "choice": {
