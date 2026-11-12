@@ -367,7 +367,7 @@ window.BOTC_AR = (() => {
     // Deal
     "Deal characters":"وزّع الشخصيات",
     "Walk round the table clockwise with your phone. Each player taps a number and sees their character in private, then taps \"Got it\". The app puts their character on their seat in the Grimoire.":"لفّ على الترابيزة مع عقارب الساعة بالموبايل. كل لاعب يدوس على رقم ويشوف شخصيته في السر، وبعدين يدوس «تمام». البرنامج بيحط شخصيته على كرسيه في كتاب الراوي.",
-    "New deck: random characters":"توزيعة جديدة: شخصيات عشوائية", "New deck: the characters I chose":"توزيعة جديدة: الشخصيات اللي أنا اخترتها",
+    "New deck: random characters":"توزيعة جديدة: شخصيات عشوائية",
     "Hand the phone to":"ادّي الموبايل لـ", "Someone else is picking? Choose them:":"حد تاني هو اللي بيختار؟ اختاره:",
     "Only":"دلوقتي", "should look now.":"بس اللي يبص.", "Tap to see your character":"دوس عشان تشوف شخصيتك", "Cancel":"إلغاء",
     "Got it, hide it":"تمام، خبّيها", "Player forgot their character?":"لاعب نسي شخصيته؟", "Show again to":"ورّيها تاني لـ", "Show privately":"ورّيها في السر",
@@ -701,7 +701,6 @@ window.BOTC_AR = (() => {
     [/^Remove (.+)\?$/, "تشيل $1؟"],
     [/^Remove the imported script "(.+)"\?$/, "تشيل السكريبت اللي ضفته «$1»؟"],
     [/^Switch to (.+)\? Characters, bluffs and the deal will be cleared\. Seats and names stay\.$/, "تغيّر لـ $1؟ الشخصيات والخُدع والتوزيع هيتمسحوا. الكراسي والأسامي هيفضلوا."],
-    [/^Pick which character the (.+) thinks they are first\.$/, "اختار الشخصية اللي $1 فاكر إنه هي الأول."],
     [/^Imported "(.+)" with (\d+) characters\.(?: Skipped unknown: (.+)\.)?$/, (m, n, c, u) => `اتضاف «${n}» بـ ${c} شخصية.${u ? ` اتشالت شخصيات مش معروفة: ${u}.` : ""}`],
   ];
 
@@ -711,7 +710,6 @@ window.BOTC_AR = (() => {
     "Re-roll every character?":"تعيد توزيع كل الشخصيات؟",
     "Create 5 to 15 seats first.":"اعمل من 5 لـ 15 كرسي الأول.",
     "Create 5 to 15 seats in Setup first.":"اعمل من 5 لـ 15 كرسي في التجهيز الأول.",
-    "Give every seat a character in the Grimoire first, or use random characters.":"ادّي كل كرسي شخصية في كتاب الراوي الأول، أو استخدم شخصيات عشوائية.",
     "Start a new random deck? Current characters will be cleared.":"تبدأ توزيعة عشوائية جديدة؟ الشخصيات الحالية هتتمسح.",
     "Erase all seats, characters and notes?":"تمسح كل الكراسي والشخصيات والملاحظات؟",
     "This script supports up to 15 players.":"السكريبت ده بيتلعب لحد 15 لاعب.",

@@ -993,22 +993,13 @@ function randomAssign(){
 // ---------------------------------------------------------------------------
 let reveal = null; // {mode:"deal", cardIdx, seatId, stage} | {mode:"remind", seatId, stage}
 
-function startDeal(mode){
+function startDeal(){
   const n = state.players.length;
   if (!DIST[n]) { alert("Create 5 to 15 seats in Setup first."); return; }
-  let cards;
-  if (mode === "assigned") {
-    if (state.players.some(p => !p.char)) { alert("Give every seat a character in the Grimoire first, or use random characters."); return; }
-    const thinker = state.players.find(p => charOf(p)?.thinks && !p.drunkAs);
-    if (thinker) { alert(`Pick which character the ${charOf(thinker).name} thinks they are first.`); return; }
-    cards = state.players.map(p => ({char:p.char, drunkAs:p.drunkAs}));
-  } else {
-    if (state.players.some(p => p.char) && !confirm("Start a new random deck? Current characters will be cleared.")) return;
-    const r = rollSetup(n);
-    cards = r.chars.map(c => ({char:c, drunkAs:r.drunkAs[c] || null}));
-    state.bluffs = r.bluffs;
-  }
-  beginDeal(cards);
+  if (state.players.some(p => p.char) && !confirm("Start a new random deck? Current characters will be cleared.")) return;
+  const r = rollSetup(n);
+  state.bluffs = r.bluffs;
+  beginDeal(r.chars.map(c => ({char:c, drunkAs:r.drunkAs[c] || null})));
 }
 function beginDeal(cards){
   state.deal = {cards:shuffle(cards).map((c, i) => ({...c, num:i + 1, seat:null})), seat:state.players[0].id};
@@ -1141,8 +1132,7 @@ function viewDeal(){
   const intro = `<section class="panel"><h2>Deal characters</h2>
     <p class="muted">Walk round the table clockwise with your phone. Each player taps a number and sees their character in private, then taps "Got it". The app puts their character on their seat in the Grimoire.</p>
     <div class="row"><button class="primary" data-action="draft-open">🃏 Choose the characters myself</button>
-    <button data-action="deal-new" data-mode="random">🎲 New deck: random characters</button>
-    <button data-action="deal-new" data-mode="assigned">New deck: the characters I chose</button></div></section>`;
+    <button data-action="deal-new">🎲 New deck: random characters</button></div></section>`;
   if (state.draft) return intro + draftHtml();
   const d = state.deal;
   if (!d) return intro;
@@ -2835,7 +2825,7 @@ document.addEventListener("click", e => {
     }
     case "vote-reset": { const nm = dayState().noms.find(n => !n.done); if (nm) { nm.votes = {}; nm.idx = nextVoter(nm, 0); } break; }
     case "vote-finish": { const nm = dayState().noms.find(n => !n.done); if (nm) finishVote(nm); break; }
-    case "deal-new": state.draft = null; startDeal(b.dataset.mode); break;
+    case "deal-new": state.draft = null; startDeal(); break;
     case "draft-open": if (!DIST[state.players.length]) { alert("Create 5 to 15 seats in Setup first."); return; } draftRandom(); break;
     case "draft-random": draftRandom(); break;
     case "draft-clear": state.draft = {chars:[], drunkAs:{}}; break;
