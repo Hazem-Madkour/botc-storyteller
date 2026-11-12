@@ -143,6 +143,7 @@
 
   /* Deal */
   .deal-who { font-size:22px; margin:8px 0; }
+  .deck-row { justify-content:flex-start; gap:6px; margin-bottom:6px; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(72px, 1fr)); gap:10px; margin:10px 0; }
   .card { aspect-ratio:3/4; font-size:28px; font-weight:800; background:var(--good-bg); color:var(--good); border:2px solid var(--good); border-radius:12px; }
   .overlay { position:fixed; inset:0; z-index:50; background:var(--panel); color:var(--text); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:24px; text-align:center; }
@@ -887,7 +888,7 @@ function createSeats(){
   if (n < 5 || n > 15) { alert("This script supports 5 to 15 players."); return; }
   if (state.players.some(p => p.char) && !confirm("Replace the current seats and characters?")) return;
   state.players = Array.from({length:n}, (_, i) => ({id:uid(), name:names[i] || `Player ${i + 1}`, char:null, drunkAs:null, alive:true, ghostVote:true, reminders:[]}));
-  state.bluffs = [null, null, null]; state.deal = null; resetGameFlags(); selected = null;
+  state.bluffs = [null, null, null]; state.deal = null; state.draft = null; resetGameFlags(); selected = null;
 }
 
 // Rolls a legal character set for n players (not yet tied to seats). Small custom scripts can
@@ -1007,10 +1008,88 @@ function startDeal(mode){
     cards = r.chars.map(c => ({char:c, drunkAs:r.drunkAs[c] || null}));
     state.bluffs = r.bluffs;
   }
+  beginDeal(cards);
+}
+function beginDeal(cards){
   state.deal = {cards:shuffle(cards).map((c, i) => ({...c, num:i + 1, seat:null})), seat:state.players[0].id};
   state.players.forEach(p => Object.assign(p, {char:null, drunkAs:null, alive:true, ghostVote:true, reminders:[]}));
   resetGameFlags();
   reveal = null;
+}
+
+// ---------------------------------------------------------------------------
+// Deck builder: the Storyteller picks exactly which characters are in play,
+// then the players draw them at random by number. state.draft = {chars:[id], drunkAs:{id:fakeId}}
+// ---------------------------------------------------------------------------
+function draftFakeOptions(c, draft){
+  // Drunk / Marionette think they're an unused Townsfolk; the Lunatic thinks they're a Demon.
+  return ofTeam(c.thinks).filter(x => c.thinks === "demon" || (!draft.chars.includes(x.id) && !x.special));
+}
+function draftDefaultFake(c, draft){
+  const demon = draft.chars.map(id => BY_ID[id]).find(x => x.team === "demon");
+  if (c.thinks === "demon" && demon) return demon.id;
+  const taken = new Set(Object.values(draft.drunkAs));
+  const opts = draftFakeOptions(c, draft).filter(x => !taken.has(x.id));
+  return opts.length ? pick(opts).id : null;
+}
+function draftFixFakes(draft){
+  // Keep a fake only while its character is still in the deck and the fake is still a valid choice.
+  for (const id of Object.keys(draft.drunkAs)) if (!draft.chars.includes(id)) delete draft.drunkAs[id];
+  draft.chars.map(id => BY_ID[id]).filter(c => c.thinks).forEach(c => {
+    if (!draftFakeOptions(c, draft).some(x => x.id === draft.drunkAs[c.id])) draft.drunkAs[c.id] = draftDefaultFake(c, draft);
+  });
+}
+function draftRandom(){
+  const r = rollSetup(state.players.length);
+  state.draft = {chars:r.chars, drunkAs:{...r.drunkAs}};
+}
+function draftToggle(id){
+  const d = state.draft, i = d.chars.indexOf(id);
+  if (i >= 0) d.chars.splice(i, 1);
+  else if (d.chars.length < state.players.length) d.chars.push(id);
+  draftFixFakes(d);
+}
+function draftDeal(){
+  const d = state.draft, n = state.players.length;
+  if (d.chars.length !== n) return;
+  const chars = d.chars.map(id => BY_ID[id]), act = Object.fromEntries(TEAMS.map(t => [t, chars.filter(c => c.team === t).length]));
+  const legal = expectedOptions(chars, n).some(e => TEAMS.every(t => e[t] === act[t]));
+  if (!legal && !confirm("These team counts don't match the setup rules. Deal this deck anyway?")) return;
+  if (state.players.some(p => p.char) && !confirm("Start dealing this deck? Current characters will be cleared.")) return;
+  const used = new Set([...d.chars, ...Object.values(d.drunkAs)]);
+  // Keep the Storyteller's bluffs if they still fit, otherwise pick 3 unused Townsfolk.
+  if (!(state.bluffs || []).every(b => b && !used.has(b)))
+    state.bluffs = shuffle(ofTeam("townsfolk").filter(c => !used.has(c.id) && !c.special)).slice(0, 3).map(c => c.id);
+  beginDeal(d.chars.map(id => ({char:id, drunkAs:d.drunkAs[id] || null})));
+  state.draft = null;
+}
+function draftHtml(){
+  const d = state.draft, n = state.players.length, chars = d.chars.map(id => BY_ID[id]);
+  const act = Object.fromEntries(TEAMS.map(t => [t, chars.filter(c => c.team === t).length]));
+  const opts = expectedOptions(chars, n);
+  const full = d.chars.length === n;
+  const legal = full && opts.some(e => TEAMS.every(t => e[t] === act[t]));
+  const thinkers = chars.filter(c => c.thinks);
+  const ready = full && thinkers.every(c => d.drunkAs[c.id]);
+  const teamBlock = t => `<h3>${esc(TEAM_LABEL[t])} <span class="no-tr">${act[t]} / ${[...new Set(opts.map(e => e[t]))].join(isAr() ? " أو " : " or ")}</span></h3>
+    <div class="chip-row deck-row">${ofTeam(t).map(c => {
+      const on = d.chars.includes(c.id);
+      return `<button class="mini" data-action="draft-toggle" data-id="${c.id}" aria-pressed="${on}" ${!on && full ? "disabled" : ""}>${c.icon} ${esc(c.name)}</button>`;
+    }).join("")}</div>`;
+  return `<section class="panel"><h2>🃏 Choose the characters</h2>
+    <p class="muted">Pick exactly ${n} characters. Only you see this screen. When you deal, the players draw them at random by number.</p>
+    <div class="row"><button data-action="draft-random">🎲 Fill randomly</button><button data-action="draft-clear">Clear</button>
+      <button data-action="draft-close">Cancel</button></div>
+    <p><b class="no-tr">${d.chars.length} / ${n}</b> <span>chosen</span></p>
+    ${TEAMS.map(teamBlock).join("")}
+    ${thinkers.map(c => `<div class="row"><label for="fake-${c.id}" class="inline"><span>${c.icon} ${esc(c.name)}</span> <span>thinks they are</span></label>
+      <select id="fake-${c.id}" data-change="draft-fake" data-id="${c.id}">${draftFakeOptions(c, d).map(x =>
+        `<option value="${x.id}" ${d.drunkAs[c.id] === x.id ? "selected" : ""}>${x.icon} ${esc(x.name)}</option>`).join("")}</select></div>`).join("")}
+    ${chars.some(c => c.neighborDemon) ? `<p class="muted">⚠ The Marionette must sit next to the Demon. Drag their seat in the Grimoire.</p>` : ""}
+    ${full ? (legal ? `<div class="msg ok">✓ Character counts match the setup rules.</div>`
+      : `<div class="msg warn">⚠ Expected ${opts.map(e => TEAMS.map(t => `${e[t]} ${t}`).join(", ")).join(" or ")}. Current: ${TEAMS.map(t => `${act[t]} ${t}`).join(", ")}.</div>`) : ""}
+    <div class="row"><button class="primary big" data-action="draft-deal" ${ready ? "" : "disabled"}>🃏 Deal this deck</button></div>
+  </section>`;
 }
 
 function seatsWithoutCard(){ return state.players.filter(p => !state.deal.cards.some(c => c.seat === p.id)); }
@@ -1061,8 +1140,10 @@ function viewDeal(){
   if (!n) return `<section class="panel"><p>Create seats in <button data-action="tab" data-tab="setup">Setup</button> first (names in seating order).</p></section>`;
   const intro = `<section class="panel"><h2>Deal characters</h2>
     <p class="muted">Walk round the table clockwise with your phone. Each player taps a number and sees their character in private, then taps "Got it". The app puts their character on their seat in the Grimoire.</p>
-    <div class="row"><button class="primary" data-action="deal-new" data-mode="random">🎲 New deck: random characters</button>
+    <div class="row"><button class="primary" data-action="draft-open">🃏 Choose the characters myself</button>
+    <button data-action="deal-new" data-mode="random">🎲 New deck: random characters</button>
     <button data-action="deal-new" data-mode="assigned">New deck: the characters I chose</button></div></section>`;
+  if (state.draft) return intro + draftHtml();
   const d = state.deal;
   if (!d) return intro;
   const left = seatsWithoutCard();
@@ -2754,7 +2835,13 @@ document.addEventListener("click", e => {
     }
     case "vote-reset": { const nm = dayState().noms.find(n => !n.done); if (nm) { nm.votes = {}; nm.idx = nextVoter(nm, 0); } break; }
     case "vote-finish": { const nm = dayState().noms.find(n => !n.done); if (nm) finishVote(nm); break; }
-    case "deal-new": startDeal(b.dataset.mode); break;
+    case "deal-new": state.draft = null; startDeal(b.dataset.mode); break;
+    case "draft-open": if (!DIST[state.players.length]) { alert("Create 5 to 15 seats in Setup first."); return; } draftRandom(); break;
+    case "draft-random": draftRandom(); break;
+    case "draft-clear": state.draft = {chars:[], drunkAs:{}}; break;
+    case "draft-close": state.draft = null; break;
+    case "draft-toggle": draftToggle(b.dataset.id); break;
+    case "draft-deal": draftDeal(); break;
     case "deal-pick": reveal = {mode:"deal", cardIdx:+b.dataset.i, seatId:state.deal.seat, stage:"confirm"}; break;
     case "remind": { const id = $("#remindSel").value; if (!id) return; reveal = {mode:"remind", seatId:id, stage:"confirm"}; break; }
     case "reveal-show": reveal.stage = "show"; break;
@@ -2866,6 +2953,7 @@ document.addEventListener("change", e => {
     case "p-rem": toggleRem(p, el.dataset.rem, el.checked); break;
     case "step": state.done[el.dataset.key] = el.checked; break;
     case "deal-seat": state.deal.seat = el.value; break;
+    case "draft-fake": if (state.draft) { state.draft.drunkAs[el.dataset.id] = el.value; draftFixFakes(state.draft); } break;
     case "choice": {
       const k = el.dataset.key, arr = state.choices[k] || [];
       arr[+el.dataset.i] = el.value || null; state.choices[k] = arr; delete state.advice[k]; break;

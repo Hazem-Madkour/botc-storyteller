@@ -373,6 +373,10 @@ window.BOTC_AR = (() => {
     "Got it, hide it":"تمام، خبّيها", "Player forgot their character?":"لاعب نسي شخصيته؟", "Show again to":"ورّيها تاني لـ", "Show privately":"ورّيها في السر",
     "Everyone has a character. The Grimoire is filled in.":"كل واحد معاه شخصية. كتاب الراوي اتملا.",
     "Private reveal":"شوفها لوحدك", "Your character":"شخصيتك",
+    "Choose the characters myself":"هختار الشخصيات بنفسي", "Choose the characters":"اختار الشخصيات",
+    "Fill randomly":"املاها عشوائي", "chosen":"متختارين", "thinks they are":"فاكر نفسه", "Deal this deck":"وزّع الشخصيات دي",
+    "These team counts don't match the setup rules. Deal this deck anyway?":"أعداد الفرق دي مش ماشية مع قواعد التجهيز. توزّعها برضه؟",
+    "Start dealing this deck? Current characters will be cleared.":"تبدأ توزّع الشخصيات دي؟ الشخصيات الحالية هتتمسح.",
     // Grimoire
     "Table:":"الترابيزة:", "Circle":"دايرة", "Free placement":"توزيع حر", "Snap back to circle":"رجّعها دايرة", "Table layout":"شكل الترابيزة",
     "Drag seats to reorder them":"اسحب الكراسي عشان ترتّبها",
@@ -566,6 +570,7 @@ window.BOTC_AR = (() => {
   const nob = s => s.replace(/\bnobody\b/g, "محدش").replace(/\bnone\b/g, "مفيش");
 
   const patterns = [
+    [/^Pick exactly (\d+) characters\. Only you see this screen\. When you deal, the players draw them at random by number\.$/, (m, n) => `اختار ${n} ${+n <= 10 ? "شخصيات" : "شخصية"} بالظبط. الشاشة دي ليك إنت بس. لما توزّع، كل لاعب بيسحب رقم وبياخد شخصية منهم بالصدفة.`],
     [/^Drunk (\d)$/, "سكران $1"],
     [/^Your ability: (.+)$/, "قدرتك: $1"],
     [/^(\d+) min( ★)?$/, "$1 دقيقة$2"],
