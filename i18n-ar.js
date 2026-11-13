@@ -524,6 +524,7 @@ window.BOTC_AR = (() => {
     "Check protection first (Safe, Protected, Soldier...). You decide who dies.":"شوف الحماية الأول («في أمان»، «محمي»، العسكري...). إنت اللي بتقرر مين يموت.",
     "Show something":"ورّي حاجة", "Show any message, player, character or number on the phone":"ورّي أي رسالة أو لاعب أو شخصية أو رقم على الموبايل",
     "Show to a player":"ورّي للاعب", "Card builder":"اعمل بطاقة", "Quick titles":"عناوين جاهزة",
+    "Who is this for? (for the game log)":"ده لمين؟ (عشان سجل اللعبة)", "— not recorded —":"— متسجّلش —",
     "Fill in what they should see, then hand the phone over. Only the parts you fill in are shown. Highlighted parts fit this character.":
       "املا اللي المفروض يشوفه، وبعدين ادّيله الموبايل. اللي إنت مالِيه بس هو اللي هيظهر. الأجزاء المتعلّم عليها ★ مناسبة للشخصية دي.",
     "Title":"العنوان", "Players":"اللاعيبة", "Characters":"الشخصيات", "Add":"ضيف", "Number":"رقم", "Yes / No":"آه / لأ",

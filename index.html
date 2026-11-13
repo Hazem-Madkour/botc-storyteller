@@ -1134,6 +1134,14 @@ function finishReveal(){
 }
 
 let showing = null; // card currently shown to a woken player
+// Show a card and record it in the game log. Showing the same answer again in the
+// same night or day (e.g. after "Another suggestion") replaces the earlier entry.
+function showCard(card, to = [], key = null){
+  showing = card;
+  if (!state.phase) return;
+  if (key) dropLastLog(e => e.k === "shown" && e.key === key);
+  logEvent("shown", {key, to:to.filter(Boolean), sections:JSON.parse(JSON.stringify(card.sections))});
+}
 
 function overlayHtml(){
   if (showing) return showCardHtml(showing);
@@ -1452,6 +1460,9 @@ function composerHtml(c){
     <div class="composer-box">
       <h2>📱 Show to a player</h2>
       <p class="muted">Fill in what they should see, then hand the phone over. Only the parts you fill in are shown. Highlighted parts fit this character.</p>
+      <label for="cTo">Who is this for? (for the game log)</label>
+      <select id="cTo" data-change="c-to"><option value="">— not recorded —</option>${state.players.map(q =>
+        `<option value="${q.id}" ${c.to === q.id ? "selected" : ""}>${esc(q.name)}</option>`).join("")}</select>
       <label for="cLabel">Title</label>
       <input id="cLabel" value="${esc(shown(c.label))}" autocomplete="off">
       <div class="chip-row quick" role="group" aria-label="Quick titles">${QUICK_LABELS.map(l =>
@@ -2267,6 +2278,22 @@ const W = {
   players:{en:"Players:", ar:"اللاعيبة:", es:"Jugadores:", it:"Giocatori:"},
 };
 const listSep = () => isAr() ? "، " : ", ";
+// One line describing what a shown card said, in the current language.
+function cardSummary(sections = [], P = pName){
+  const T = s => esc(L() ? trFull(s) : s), sep = listSep();
+  return sections.map(s => {
+    const parts = [];
+    if (s.label) parts.push(T(s.label).replace(/[:.:。]\s*$/, "") + ":");
+    if (s.token) parts.push(cName(s.token));
+    if (s.tokens) parts.push(s.tokens.map(cName).join(sep) || lx({en:"none", ar:"مفيش", es:"ninguno", it:"nessuno"}));
+    if (s.names) parts.push(s.names.map(P).join(sep) || lx({en:"nobody", ar:"محدش", es:"nadie", it:"nessuno"}));
+    if (s.number != null) parts.push(`<b>${s.number}</b>`);
+    if (s.yesno) parts.push(s.yesno === "YES" ? lx({en:"yes", ar:"آه", es:"sí", it:"sì"}) : lx({en:"no", ar:"لأ", es:"no", it:"no"}));
+    if (s.align) parts.push(T(ALIGN_LABEL[s.align]));
+    if (s.text) parts.push(`«${esc(s.text)}»`);
+    return parts.join(" ").replace(/:$/, "");
+  }).join(" · ");
+}
 // One line per event, written directly in each language.
 // P = how to turn a player id into a name (past games pass their own saved names).
 function logLine(e, P = pName){
@@ -2294,6 +2321,11 @@ function logLine(e, P = pName){
       return lx({en:`${who} chose ${what}`, ar:`${who} اختار: ${what}`, es:`${who} eligió: ${what}`, it:`${who} ha scelto: ${what}`});
     }
     case "day": return `${BY_ID[e.eff]?.icon || "☀️"} ${P(e.p)} (${esc(BY_ID[e.eff]?.name)}): ${esc(lx(e))}`;
+    case "shown": {
+      const sum = cardSummary(e.sections, P), who = (e.to || []).map(P).join(listSep());
+      return who ? lx({en:`📱 Told ${who}: ${sum}`, ar:`📱 قلت لـ ${who}: ${sum}`, es:`📱 Le dijiste a ${who}: ${sum}`, it:`📱 Hai detto a ${who}: ${sum}`})
+        : lx({en:`📱 Shown: ${sum}`, ar:`📱 اتعرض: ${sum}`, es:`📱 Mostrado: ${sum}`, it:`📱 Mostrato: ${sum}`});
+    }
     case "end": return e.winner === "good"
       ? lx({en:"🏁 Game over: Good wins", ar:"🏁 اللعبة خلصت: الطيبين كسبوا", es:"🏁 Fin de la partida: gana el Bien", it:"🏁 Fine partita: vince il Bene"})
       : lx({en:"🏁 Game over: Evil wins", ar:"🏁 اللعبة خلصت: الأشرار كسبوا", es:"🏁 Fin de la partida: gana el Mal", it:"🏁 Fine partita: vince il Male"});
@@ -2796,8 +2828,8 @@ document.addEventListener("click", e => {
   const toggle = (k, v) => { composer[k] = composer[k] === v ? null : v; };
   switch (a) {
     case "compose": {
-      if (b.dataset.youare) { const q = playerById(b.dataset.youare); composer = blankComposer({label:"You are", tokens:[effective(q).id], focus:["tokens"]}); }
-      else if (b.dataset.step) { const s = isNight() ? nightSteps().find(x => x.key === b.dataset.step) : null; composer = s ? presetForStep(s) : blankComposer(); }
+      if (b.dataset.youare) { const q = playerById(b.dataset.youare); composer = blankComposer({label:"You are", tokens:[effective(q).id], focus:["tokens"], to:q.id}); }
+      else if (b.dataset.step) { const s = isNight() ? nightSteps().find(x => x.key === b.dataset.step) : null; composer = s ? {...presetForStep(s), to:s.pid || null} : blankComposer(); }
       else composer = blankComposer();
       break;
     }
@@ -2809,7 +2841,7 @@ document.addEventListener("click", e => {
     case "c-align": toggle("align", b.dataset.v); break;
     case "c-clear": composer = blankComposer({label:""}); break;
     case "c-cancel": composer = null; break;
-    case "c-show": showing = composerCard(composer); composer = null; break;
+    case "c-show": showCard(composerCard(composer), composer.to ? [composer.to] : []); composer = null; break;
     // "Ask them to choose"
     case "p-open": {
       const s = isNight() ? nightSteps().find(x => x.key === b.dataset.step) : null; if (!s) return;
@@ -2986,8 +3018,14 @@ document.addEventListener("click", e => {
     case "reveal-open": revealOpen = true; break;
     case "reveal-close": revealOpen = false; break;
     case "reroll": delete state.advice[b.dataset.key]; break;
-    case "show-card": showing = state.advice[b.dataset.key]?.card || null; break;
-    case "show-step": showing = stepCard(b.dataset.step, b.dataset.pid); break;
+    case "show-card": { const k = b.dataset.key, card = state.advice[k]?.card; if (card) showCard(card, [k.split(":").slice(1).join(":")], "adv:" + k); break; }
+    case "show-step": {
+      const st = b.dataset.step, card = stepCard(st, b.dataset.pid), ps = state.players;
+      const to = st === "minioninfo" ? ps.filter(q => charOf(q)?.team === "minion" && q.char !== "marionette").map(q => q.id)
+        : st === "demoninfo" ? ps.filter(isDemon).map(q => q.id) : b.dataset.pid ? [b.dataset.pid] : [];
+      if (card) showCard(card, to, "step:" + st + ":" + (b.dataset.pid || ""));
+      break;
+    }
     case "sw-takeover": {
       const sw = playerById(b.dataset.id); if (!sw) return;
       const dead = state.players.filter(q => isDemon(q) && !q.alive);
@@ -3046,6 +3084,7 @@ document.addEventListener("change", e => {
     case "p-rem": toggleRem(p, el.dataset.rem, el.checked); break;
     case "step": state.done[el.dataset.key] = el.checked; break;
     case "lang": state.lang = el.value; state.advice = {}; applyLang(); break;
+    case "c-to": if (composer) { composer.to = el.value || null; composer.label = $("#cLabel").value; composer.text = $("#cText").value; refocus = "#cTo"; } break;
     case "draft-count": if (state.draft) state.draft.counts[el.dataset.team] = Math.max(0, Math.min(state.players.length, parseInt(el.value, 10) || 0)); break;
     case "deal-seat": state.deal.seat = el.value; break;
     case "draft-fake": if (state.draft) { state.draft.drunkAs[el.dataset.id] = el.value; draftFixFakes(state.draft); } break;

@@ -528,6 +528,7 @@ window.BOTC_IT = (() => {
     "Check protection first (Safe, Protected, Soldier...). You decide who dies.":"Controlla prima le protezioni («Al sicuro», «Protetto», il Soldato...). Decidi tu chi muore.",
     "Show something":"Mostra qualcosa", "Show any message, player, character or number on the phone":"Mostra sul telefono un messaggio, un giocatore, un personaggio o un numero",
     "Show to a player":"Mostra a un giocatore", "Card builder":"Crea una scheda", "Quick titles":"Titoli rapidi",
+    "Who is this for? (for the game log)":"Per chi è? (per il registro della partita)", "— not recorded —":"— non registrato —",
     "Fill in what they should see, then hand the phone over. Only the parts you fill in are shown. Highlighted parts fit this character.":
       "Compila quello che deve vedere, poi passagli il telefono. Si vedono solo le parti che compili. Le parti evidenziate sono adatte a questo personaggio.",
     "Title":"Titolo", "Characters":"Personaggi", "Add":"Aggiungi", "Number":"Numero", "Yes / No":"Sì / No",
