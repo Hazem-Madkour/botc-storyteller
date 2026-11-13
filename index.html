@@ -3090,7 +3090,12 @@ document.addEventListener("change", e => {
     case "draft-fake": if (state.draft) { state.draft.drunkAs[el.dataset.id] = el.value; draftFixFakes(state.draft); } break;
     case "choice": {
       const k = el.dataset.key, arr = state.choices[k] || [];
-      arr[+el.dataset.i] = el.value || null; state.choices[k] = arr; delete state.advice[k]; break;
+      arr[+el.dataset.i] = el.value || null; state.choices[k] = arr; delete state.advice[k];
+      // Log the choice (replacing an earlier one for the same step), as "Ask them to choose" does.
+      const pid = k.split(":").slice(1).join(":"), who = playerById(pid), players = arr.filter(Boolean);
+      dropLastLog(e => e.k === "pick" && (e.key ? e.key === k : e.p === pid));
+      if (who && players.length) logEvent("pick", {key:k, p:pid, eff:effective(who)?.id, players});
+      break;
     }
     case "balance": {
       state.balance = el.value;
